@@ -246,6 +246,9 @@ def cmd_agt_chk(args: argparse.Namespace) -> int:
     return 1
 
 
+import importlib.resources
+import shutil
+
 def cmd_agt_init(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
 
@@ -263,6 +266,18 @@ def cmd_agt_init(args: argparse.Namespace) -> int:
         sys.stdout.write(f"[NVA103] agt init: {exc}\n")
         return 2
 
+    # Copiar nova_skill.md al proyecto
+    skill_dst = root / "nova_skill.md"
+    if not skill_dst.exists() or bool(args.force):
+        try:
+            skill_src = Path(__file__).parent / "data" / "nova_skill.md"
+            shutil.copy2(skill_src, skill_dst)
+            skill_status = "written"
+        except Exception as exc:
+            skill_status = f"skipped ({exc})"
+    else:
+        skill_status = "kept"
+
     dict_status = "written" if report.dictionary_written else "kept"
     md_status = "written" if report.guide_written else "kept"
     agent_status = "written" if report.agent_written else "kept"
@@ -271,10 +286,10 @@ def cmd_agt_init(args: argparse.Namespace) -> int:
         f"agent={report.agent_path} ({agent_status}) "
         f"dict={report.dictionary_path} ({dict_status}) "
         f"md={report.guide_path} ({md_status}) "
+        f"skill=nova_skill.md ({skill_status}) "
         f"agent_rows={report.agent_rows} dict_rows={report.dictionary_rows}\n"
     )
     return 0
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nova", description=f"NOVA v{VERSION} parser + runtime + backends")
@@ -355,6 +370,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_agt_chk.add_argument("--root", default=".", help="Project root (default: current dir)")
     p_agt_chk.add_argument("--file", help="Path to idx.toon (default: <root>/.nova/idx.toon)")
     p_agt_chk.set_defaults(func=cmd_agt_chk)
+
+    p_agt_check = agt_sub.add_parser("check", help="Alias of agt chk")
+    p_agt_check.add_argument("--root", default=".", help="Project root (default: current dir)")
+    p_agt_check.add_argument("--file", help="Path to idx.toon (default: <root>/.nova/idx.toon)")
+    p_agt_check.set_defaults(func=cmd_agt_chk)
 
     p_agt_pack = agt_sub.add_parser("pack", help="Emit compact context payload")
     p_agt_pack.add_argument("--root", default=".", help="Project root (default: current dir)")

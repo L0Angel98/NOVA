@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Tuple
 TOON_VERSION_LINE = "@toon v1"
 TOON_TABLE_LINE = "@type table"
 TOON_JSON_LINE = "@type json"
+TOON_STD_LINE = "@type std"
 
 HEADER_PATTERN = re.compile(r"^(?P<name>[^\[\]]+?)(?:\[(?P<len>[0-9]+)\])?$")
 INT_PATTERN = re.compile(r"^[+-]?[0-9]+$")
@@ -54,6 +55,8 @@ def decode_toon(text: str) -> Any:
         return _decode_table(lines[2:])
     if mode == TOON_JSON_LINE:
         return _decode_json_fallback(lines[2:])
+    if mode == TOON_STD_LINE:
+        return _decode_standard(lines[2:])
 
     raise ToonDecodeError(f"unsupported TOON type header: {mode}")
 
@@ -188,6 +191,182 @@ def _decode_json_fallback(lines: List[str]) -> Any:
         raise ToonDecodeError(f"invalid json payload in TOON: {exc}") from exc
 
 
+def _decode_standard(lines: List[str]) -> Any:
+    if not lines:
+        return {}
+
+    entries = _parse_standard_entries(lines)
+    if not entries:
+        return {}
+
+    root = _parse_standard_tree(entries)
+    return _materialize_standard_root(root)
+
+
+def _parse_standard_entries(lines: List[str]) -> List[Tuple[int, str]]:
+    out: List[Tuple[int, str]] = []
+    for idx, raw in enumerate(lines):
+        if raw.strip() == "":
+            continue
+        indent_spaces = len(raw) - len(raw.lstrip(" "))
+        if indent_spaces % 2 != 0:
+            raise ToonDecodeError(f"invalid indentation at standard line {idx + 1}: use 2-space steps")
+        out.append((indent_spaces // 2, raw.strip()))
+    return out
+
+
+def _parse_standard_tree(entries: List[Tuple[int, str]]) -> Dict[str, Any]:
+    root: Dict[str, Any] = {"name": "__root__", "table": None, "children": []}
+    stack: List[Tuple[int, Dict[str, Any]]] = [(-1, root)]
+
+    i = 0
+    while i < len(entries):
+        depth, content = entries[i]
+        while stack and stack[-1][0] >= depth:
+            stack.pop()
+        if not stack:
+            raise ToonDecodeError("invalid standard TOON nesting")
+
+        if not content.endswith(":"):
+            raise ToonDecodeError(f"expected '<block>:' at standard line {i + 1}, got '{content}'")
+
+        name = content[:-1].strip()
+        if name == "":
+            raise ToonDecodeError(f"empty block name at standard line {i + 1}")
+
+        node: Dict[str, Any] = {"name": name, "table": None, "children": []}
+        stack[-1][1]["children"].append(node)
+
+        j = i + 1
+        if j < len(entries) and entries[j][0] == depth + 1 and entries[j][1].startswith("|"):
+            header_cells = _parse_pipe_line(entries[j][1])
+            j += 1
+
+            rows: List[Dict[str, Any]] = []
+            while j < len(entries) and entries[j][0] == depth + 1 and entries[j][1].startswith("|"):
+                cells = _parse_pipe_line(entries[j][1])
+                if len(cells) != len(header_cells):
+                    raise ToonDecodeError(
+                        f"standard row at line {j + 1} has {len(cells)} cells, expected {len(header_cells)}"
+                    )
+                row: Dict[str, Any] = {}
+                for cidx, col in enumerate(header_cells):
+                    row[col] = _decode_cell(cells[cidx])
+                rows.append(row)
+                j += 1
+            node["table"] = {"header": header_cells, "rows": rows}
+
+        stack.append((depth, node))
+        i = j
+
+    return root
+
+
+def _materialize_standard_root(root: Dict[str, Any]) -> Any:
+    out: Dict[str, Any] = {}
+    for child in root["children"]:
+        key = _normalize_standard_key(str(child["name"]))
+        if key in out:
+            raise ToonDecodeError(f"duplicate top-level standard block '{key}'")
+        out[key] = _materialize_standard_node(child)
+
+    root_obj = out.pop("root", None)
+    if isinstance(root_obj, dict):
+        merged = dict(root_obj)
+        for key, value in out.items():
+            merged[key] = value
+        return merged
+    if root_obj is not None:
+        out["root"] = root_obj
+    return out
+
+
+def _materialize_standard_node(node: Dict[str, Any]) -> Any:
+    table = node.get("table")
+    children = node.get("children", [])
+
+    if table is None:
+        base: Any = {}
+    else:
+        base = _materialize_standard_table(table["header"], table["rows"])
+
+    if not children:
+        return base
+
+    if isinstance(base, dict):
+        out: Dict[str, Any] = dict(base)
+    else:
+        out = {"rows": base}
+
+    for child in children:
+        key = _normalize_standard_key(str(child["name"]))
+        value = _materialize_standard_node(child)
+        if key in out:
+            raise ToonDecodeError(f"duplicate standard nested block '{key}'")
+        out[key] = value
+    return out
+
+
+def _materialize_standard_table(header: List[str], rows: List[Dict[str, Any]]) -> Any:
+    if header == ["k", "v"]:
+        out: Dict[str, Any] = {}
+        for row in rows:
+            key = str(row.get("k", ""))
+            if key == "":
+                raise ToonDecodeError("standard k/v table row with empty key")
+            if key in out:
+                raise ToonDecodeError(f"duplicate key '{key}' in standard k/v table")
+            out[key] = row.get("v")
+        return out
+
+    if header and header[0] == "k" and len(header) > 2:
+        out_obj: Dict[str, Any] = {}
+        for row in rows:
+            key = str(row.get("k", ""))
+            if key == "":
+                raise ToonDecodeError("standard keyed table row with empty key")
+            if key in out_obj:
+                raise ToonDecodeError(f"duplicate key '{key}' in standard keyed table")
+            payload: Dict[str, Any] = {}
+            for col in header[1:]:
+                payload[col] = row.get(col)
+            out_obj[key] = payload
+        return out_obj
+
+    if header == ["i", "v"]:
+        return [item[1].get("v") for item in _sorted_index_rows(rows)]
+
+    if header and header[0] == "i":
+        out_rows: List[Dict[str, Any]] = []
+        for _, row in _sorted_index_rows(rows):
+            item = {k: v for k, v in row.items() if k != "i"}
+            out_rows.append(item)
+        return out_rows
+
+    return rows
+
+
+def _sorted_index_rows(rows: List[Dict[str, Any]]) -> List[Tuple[int, Dict[str, Any]]]:
+    indexed: List[Tuple[int, Dict[str, Any]]] = []
+    seen: set[int] = set()
+    for row in rows:
+        raw = row.get("i")
+        if not isinstance(raw, int):
+            raise ToonDecodeError("standard indexed table requires integer 'i' column")
+        if raw in seen:
+            raise ToonDecodeError(f"duplicate index '{raw}' in standard indexed table")
+        seen.add(raw)
+        indexed.append((raw, row))
+    indexed.sort(key=lambda item: item[0])
+    return indexed
+
+
+def _normalize_standard_key(name: str) -> str:
+    if name.startswith("#nova_"):
+        return name[6:]
+    return name
+
+
 def _infer_array_lengths(rows: List[Dict[str, Any]], columns: List[str]) -> Dict[str, int]:
     lengths: Dict[str, int] = {}
     for col in columns:
@@ -248,8 +427,9 @@ def _decode_cell(raw: str) -> Any:
 
     try:
         return json.loads(token)
-    except json.JSONDecodeError as exc:
-        raise ToonDecodeError(f"invalid TOON cell token '{token}': {exc}") from exc
+    except json.JSONDecodeError:
+        # TOON std accepts bare tokens for compact scalar strings.
+        return token
 
 
 def _parse_rows_header(line: str) -> int:

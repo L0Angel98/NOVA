@@ -675,3 +675,13 @@ def parse_nova(source: str) -> Dict[str, Any]:
         source = source.lstrip("\ufeff")
     tokens = lex(source)
     return Parser(tokens).parse()
+
+
+def parse_toon(source: str) -> Any:
+    """Parse TOON payloads (table/json/std) into JSON-compatible values."""
+    from .toon import ToonDecodeError, decode_toon
+
+    try:
+        return decode_toon(source)
+    except ToonDecodeError as exc:
+        raise ParseError(f"invalid TOON payload: {exc}") from exc
