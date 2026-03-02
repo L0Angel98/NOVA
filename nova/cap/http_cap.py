@@ -32,7 +32,7 @@ def http_get(url: Any, h: Any = None, t: Any = None) -> Dict[str, Any]:
         if timeout <= 0:
             raise HttpCapError("NET_INPUT", "timeout must be > 0")
 
-    headers: Dict[str, str] = {"User-Agent": "nova/0.1.5"}
+    headers: Dict[str, str] = {"User-Agent": "nova/0.1.5.1"}
     if h is not None:
         if not isinstance(h, dict):
             raise HttpCapError("NET_INPUT", "headers must be object")
