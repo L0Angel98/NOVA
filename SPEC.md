@@ -1,4 +1,4 @@
-# NOVA Language Specification v0.1.3
+# NOVA Language Specification v0.1.4
 
 Estado: contrato normativo minimo para v0.1.
 Alcance: DSL IA-first para APIs y scripting.
@@ -6,7 +6,7 @@ No alcance: detalles internos de runtime, transporte HTTP real y motor DB fisico
 
 ## Overview / Goals
 
-NOVA v0.1.3 define una superficie estable para codigo orientado a IA:
+NOVA v0.1.4 define una superficie estable para codigo orientado a IA:
 
 - Menos tokens por intencion.
 - Menos ambiguedad sintactica.
@@ -14,12 +14,13 @@ NOVA v0.1.3 define una superficie estable para codigo orientado a IA:
 - Flujo declarativo para rutas y DB IR.
 - Salida consistente mediante `rst` y `err`.
 
-## Versioning (v0.1.3 notes)
+## Versioning (v0.1.4 notes)
 
 - `v0.1.0`: base de lenguaje (`rte`, `tb/whe/lim/ord`, `cap`, `rst/err`).
 - `v0.1.1`: `str"..."` deja de ser sintaxis canonica.
 - `v0.1.2`: breaking change: metodos HTTP son keywords sin comillas.
 - `v0.1.3`: IR estable + backends pluggable (`interp`, `llvm`, `go` stub), caps `http/html/db` y agent index `.nova/idx.toon`.
+- `v0.1.4`: runtime HTTP nativo en backend `llvm` y capabilities nativas (`net/html/db`) desde binario.
 
 ## Lexical structure
 
@@ -30,7 +31,7 @@ NOVA v0.1.3 define una superficie estable para codigo orientado a IA:
 
 ## Keywords (reserved)
 
-Keywords reservadas en v0.1.3:
+Keywords reservadas en v0.1.4:
 
 - Control: `let`, `if`, `els`, `match`, `asy`, `awt`
 - Modulo/API: `mdl`, `grd`, `rte`, `cap`, `rst`, `err`
@@ -43,7 +44,7 @@ Reglas:
 - `mdl` y `grd` son keywords reservadas.
 - Ninguna keyword reservada puede usarse como identificador.
 
-## Runtime namespaces & builtins (standard v0.1.3)
+## Runtime namespaces & builtins (standard v0.1.4)
 
 Elementos estandar del runtime:
 
@@ -58,7 +59,7 @@ Elementos estandar del runtime:
 
 ## HTTP routing (rte + methods)
 
-Forma canonica v0.1.3:
+Forma canonica v0.1.4:
 
 ```nova
 rte GET "/path" {

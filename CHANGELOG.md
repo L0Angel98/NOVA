@@ -1,4 +1,17 @@
-# Changelog
+﻿# Changelog
+
+## v0.1.4 (2026-03-02)
+
+- LLVM backend ahora compila binarios con runtime HTTP nativo (`axum`) para `rte GET ...`.
+- `nova-llvm` agrega modo `build` y modo `serve`/runtime con sidecar IR.
+- Capabilities nativas en binario (sin runtime Python):
+  - `http.get` (`reqwest`) -> `{st, hd, bd}`
+  - `html.tte` / `html.sct` (`scraper`)
+  - `db.opn/qry/cls` SQLite (`rusqlite`)
+- Guardas de permisos en binario (`--cap net|db|fs|env`) con error claro `[NVR200]`.
+- `nova serve --b llvm` compila y ejecuta binario nativo con flags de caps/puerto.
+- IR v0.1.4 anade `irv` y preserva `cap` como nodo para paridad de permisos.
+- Nuevos demos: `demo/llvm_serve_profile.nv`, `demo/llvm_db.nv`.
 
 ## v0.1.3 (2026-03-02)
 
@@ -12,4 +25,3 @@
 - Agent context index automatico en `.nova/idx.toon` con `nova agt init/sync`.
 - Nuevos demos ejecutables: `hello_llvm.nv`, `scrape_profile.nv`, `db_sqlite.nv`.
 - Version bump de paquete y CLI a `0.1.3`.
-

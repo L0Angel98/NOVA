@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List
 
-from .nodes import IrArr, IrCall, IrExpr, IrId, IrJson, IrLet, IrMdl, IrObj, IrRstErr, IrRstOk, IrRte, IrStmt
+from .nodes import IrArr, IrCall, IrCap, IrExpr, IrId, IrJson, IrLet, IrMdl, IrObj, IrRstErr, IrRstOk, IrRte, IrStmt
 
 
 class IrEmitError(ValueError):
@@ -17,11 +17,11 @@ def emit_ir(ast: Dict[str, Any], *, source_path: str | Path = "main.nv") -> IrMd
     module = _first_module(ast.get("body", []))
     if module is not None:
         name = module.get("name") or _stem_name(source_path)
-        version = module.get("version") or "0.1.3"
+        version = module.get("version") or "0.1.4"
         body = module.get("body", [])
     else:
         name = _stem_name(source_path)
-        version = "0.1.3"
+        version = "0.1.4"
         body = ast.get("body", [])
 
     routes: List[IrRte] = []
@@ -38,7 +38,7 @@ def emit_ir(ast: Dict[str, Any], *, source_path: str | Path = "main.nv") -> IrMd
         if emitted is not None:
             script_body.append(emitted)
 
-    return IrMdl(n=name, v=version, rte=routes, b=script_body)
+    return IrMdl(irv="0.1.4", n=name, v=version, rte=routes, b=script_body)
 
 
 def _first_module(body: List[Dict[str, Any]]) -> Dict[str, Any] | None:
@@ -88,7 +88,7 @@ def _emit_stmt(stmt: Dict[str, Any], *, allow_cap_stmt: bool) -> IrStmt | None:
     if typ == "ErrorStmt":
         return IrRstErr(v=_emit_expr(stmt["value"]))
     if typ == "CapStmt" and allow_cap_stmt:
-        return None
+        return IrCap(c=_emit_caps(stmt.get("value")))
     raise IrEmitError(f"unsupported statement type '{typ}' for IR")
 
 
@@ -173,3 +173,18 @@ def _route_format(expr: Dict[str, Any] | None) -> str:
         raise IrEmitError("rte format must be json|toon")
     return fmt
 
+
+def _emit_caps(expr: Dict[str, Any] | None) -> List[str]:
+    if not isinstance(expr, dict):
+        return []
+    typ = expr.get("type")
+    if typ == "ArrayLiteral":
+        out: List[str] = []
+        for item in expr.get("items", []):
+            out.extend(_emit_caps(item))
+        return sorted({item for item in out if item != ""})
+    if typ == "Identifier":
+        return [str(expr.get("name", "")).strip()]
+    if typ == "StringLiteral":
+        return [str(expr.get("value", "")).strip()]
+    return []

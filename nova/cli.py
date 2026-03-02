@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import tempfile
 from pathlib import Path
+import subprocess
 import sys
 
 from .agent_context import (
@@ -120,8 +122,53 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
+    if args.backend == "llvm":
+        src_path = Path(args.entry).resolve()
+        out_dir = Path(args.out_dir).resolve()
+        caps = _caps(args)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="nova-llvm-serve-", dir=str(out_dir)) as tmp:
+            tmp_out = Path(tmp)
+            try:
+                ir_path, ir = _write_ir(src_path, tmp_out)
+                backend = get_backend("llvm")
+                result = backend.build(
+                    ir=ir,
+                    ir_path=ir_path,
+                    src_path=src_path,
+                    out_dir=tmp_out,
+                    caps=caps,
+                )
+            except (IrEmitError, BackendError, RuntimeError, ValueError) as exc:
+                sys.stdout.write(f"[NVR100] build llvm: {exc}\n")
+                return 2
+
+            cmd = [str(result.artifact), "--port", str(args.port), "--root", str(Path(args.root).resolve())]
+            for cap in sorted(caps):
+                cmd.extend(["--cap", cap])
+            try:
+                proc = subprocess.Popen(cmd)
+                return int(proc.wait())
+            except KeyboardInterrupt:
+                if proc.poll() is None:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except Exception:
+                        proc.kill()
+                return 130
+            except Exception as exc:
+                if "proc" in locals() and proc.poll() is None:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except Exception:
+                        proc.kill()
+                sys.stdout.write(f"[NVR101] serve llvm: {exc}\n")
+                return 2
+
     if args.backend != "interp":
-        sys.stdout.write("[NVR099] serve: only --b interp is supported in v0.1.3\n")
+        sys.stdout.write("[NVR099] serve: unsupported backend for serve\n")
         return 2
 
     try:
@@ -269,8 +316,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_serve = sub.add_parser("serve", help="Run NOVA HTTP runtime")
     p_serve.add_argument("entry", help="Entry .nv app file")
     p_serve.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
-    p_serve.add_argument("--port", type=int, default=8080, help="Bind port (default: 8080)")
+    p_serve.add_argument("--port", type=int, default=3000, help="Bind port (default: 3000)")
     p_serve.add_argument("--b", dest="backend", default="interp", choices=["interp", "llvm", "go"], help="Backend")
+    p_serve.add_argument("--out-dir", default="out", help="Build output dir for llvm mode")
+    p_serve.add_argument("--root", default=".", help="Project root for llvm relative paths")
     p_serve.add_argument(
         "--cap",
         dest="capabilities",
@@ -318,4 +367,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
