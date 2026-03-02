@@ -103,6 +103,8 @@ nova agt init --root .
 nova agt sync --root .
 ```
 
+Nota para agente: `agt init` crea `.nova/idx.toon`, `agent.dictionary.toon` y `NOVA_LANGUAGE.md`; flujo recomendado: leer esos archivos, ejecutar `agt sync` tras cambios y usar `agt pack` antes de responder solo si no tienes suficiente contexto del proyecto.
+
 ## Demos
 
 ```bash
