@@ -42,6 +42,8 @@ NET_DRV_META = {
     "sel": "env:NOVA_NET_DRIVER",
     "nt": "browser=headless,install_chromium,js",
 }
+AGT_CTX_FILES = [".nova/idx.toon", "agent.dictionary.toon", "NOVA_LANGUAGE.md"]
+AGT_PROMPT = "read ctxf first; on project change run agt sync; before answer run agt pack"
 
 
 @dataclass(frozen=True)
@@ -166,6 +168,8 @@ def sync_agent(root: Path, agent_path: Path | None = None) -> AgentSyncReport:
         "api": routes,
         "cap": caps,
         "nd": NET_DRV_META,
+        "ctxf": AGT_CTX_FILES,
+        "prm": AGT_PROMPT,
         "m": fmap,
         "dep": deps,
         "chg": chg,
@@ -236,6 +240,8 @@ def _init_index(root: Path, path: Path, *, force: bool) -> bool:
         "api": [],
         "cap": [],
         "nd": NET_DRV_META,
+        "ctxf": AGT_CTX_FILES,
+        "prm": AGT_PROMPT,
         "m": {},
         "dep": [],
         "chg": [{"at": _utc_now_iso(), "op": "init"}],
@@ -422,6 +428,8 @@ def _default_agent_rows(root: Path) -> List[AgentRow]:
     cxa = {"q": "query", "p": "params", "h": "headers", "b": "body"}
     cap = {"net": "http.get", "html": ["tte", "sct"]}
     nd = NET_DRV_META
+    ctxf = AGT_CTX_FILES
+    prm = AGT_PROMPT
     fs = {"ent": len(list(_iter_project_files(root))), "upd": _utc_now_iso()}
     fls = _important_files(root, max_items=30)
     tsk = ["sync", "chk", "pack"]
@@ -438,6 +446,8 @@ def _default_agent_rows(root: Path) -> List[AgentRow]:
         AgentRow(key="cxa", value=_to_stable_value(cxa), origin="manual"),
         AgentRow(key="cap", value=_to_stable_value(cap), origin="manual"),
         AgentRow(key="nd", value=_to_stable_value(nd), origin="manual"),
+        AgentRow(key="ctxf", value=_to_stable_value(ctxf), origin="manual"),
+        AgentRow(key="prm", value=prm, origin="manual"),
         AgentRow(key="fs", value=_to_stable_value(fs), origin="manual"),
         AgentRow(key="fls", value=_to_stable_value(fls), origin="manual"),
         AgentRow(key="tsk", value=_to_stable_value(tsk), origin="manual"),
