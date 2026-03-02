@@ -1,0 +1,8 @@
+mdl scrape v"0.1.2" rst<any, err> {
+  rte GET "/scrape" {
+    let pg = cap http.get("https://example.com")
+    let ti = cap html.tte(pg)
+    let h1 = cap html.sct(pg, "h1")
+    rst.ok({ title: ti, h1: h1 })
+  }
+}
