@@ -1,4 +1,13 @@
-﻿# Changelog
+# Changelog
+
+## v0.1.5 (2026-03-02)
+
+- add optional node-based net driver for improved scraping compatibility.
+- `cap http.get` ahora selecciona driver por `NOVA_NET_DRIVER=py|node` (default `py`).
+- Nuevo driver `node` con Node.js 18+ y `fetch` nativo via subprocess.
+- Contrato estable de salida para `http.get`: `{st, hd, bd}`.
+- Manejo de errores explicito para driver invalido, Node faltante y fallos de red.
+- Benchmark documentado en `METRICS_NET.md`.
 
 ## v0.1.4 (2026-03-02)
 

@@ -9,8 +9,11 @@ from .toon import decode_toon, encode_toon
 from .agent_context import check_agent, pack_agent, sync_agent
 from .version import VERSION
 
+__version__ = VERSION
+
 __all__ = [
     "VERSION",
+    "__version__",
     "parse_nova",
     "format_nova",
     "check_ast",

@@ -1,4 +1,4 @@
-﻿# NOVA v0.1.4
+# NOVA v0.1.5
 
 NOVA es un DSL IA-first para APIs y scripting con IR estable y backends pluggable.
 
@@ -9,7 +9,7 @@ pip install -e .
 nova --version
 ```
 
-## v0.1.4
+## v0.1.5
 
 ### Backends
 
@@ -17,28 +17,33 @@ nova --version
 - `llvm`: AOT con runtime HTTP nativo en binario (`axum` + caps nativas).
 - `go`: stub pluggable.
 
+### Net drivers
+
+- `py` (default): `requests`
+- `node` (opcional): Node.js 18+ con `fetch` nativo
+
+Selector por entorno:
+
 ```bash
-nova build demo/llvm_serve_profile.nv --b llvm
-nova serve demo/llvm_serve_profile.nv --b llvm --cap net --port 3000
+export NOVA_NET_DRIVER=py
+nova serve demo/llvm_serve_profile.nv --cap net
 ```
 
-### Capabilities
+```bash
+export NOVA_NET_DRIVER=node
+nova serve demo/llvm_serve_profile.nv --cap net
+```
 
-Output IA-first con keys cortas.
+PowerShell:
+
+```powershell
+$env:NOVA_NET_DRIVER="node"
+nova serve demo/llvm_serve_profile.nv --cap net
+```
+
+Contrato de `http.get` (sin cambios):
 
 - `http.get(url, h?, t?) -> {st, hd, bd}`
-- `html.tte(html) -> str`
-- `html.sct(html, css) -> [str]`
-- `db.opn(path) -> handle`, `db.qry(h, sql, args?)`, `db.cls(h)`
-
-Permisos en runtime LLVM:
-
-- `--cap net`
-- `--cap db`
-- `--cap fs`
-- `--cap env`
-
-Sin permiso requerido se responde error claro (`NVR200`).
 
 ### Agent Context Index
 
@@ -47,31 +52,18 @@ nova agt init --root .
 nova agt sync --root .
 ```
 
-Archivo generado: `.nova/idx.toon` con keys `v, rt, sum, api, cap, m, dep, chg, ts`.
-
 ## Demos
-
-### 1) LLVM nativo: profile scraping
 
 ```bash
 nova build demo/llvm_serve_profile.nv --b llvm
-./out/llvm_serve_profile --cap net --port 3000        # Windows: .\out\llvm_serve_profile.exe --cap net --port 3000
+./out/llvm_serve_profile --cap net --port 3000
 curl http://127.0.0.1:3000/profile
 ```
 
-### 2) LLVM nativo: SQLite
-
 ```bash
 nova build demo/llvm_db.nv --b llvm
-./out/llvm_db --cap db --port 3001                    # Windows: .\out\llvm_db.exe --cap db --port 3001
+./out/llvm_db --cap db --port 3001
 curl http://127.0.0.1:3001/db
-```
-
-### 3) Interp (compatibilidad v0.1.3)
-
-```bash
-nova run demo/db_sqlite.nv --cap db
-nova serve demo/scrape_profile.nv --cap net --port 8099
 ```
 
 ## Testing
@@ -80,10 +72,3 @@ nova serve demo/scrape_profile.nv --cap net --port 8099
 python -m unittest discover -s tests -v
 cd compiler/llvm && cargo test
 ```
-
-## Limitaciones v0.1.4
-
-- Backend LLVM soporta subset de handlers (`let`, `cap call`, `rst.ok/err`, JSON literals).
-- `rte` soportado para flujo HTTP JSON (GET/otros metodos por matching basico).
-- No hay aun compilacion LLVM de AST a machine IR por funcion; se usa runtime embebido con IR interpreter.
-- v0.1.5 objetivo: ampliar subset (if/match), typed body JSON robusto y optimizer/codegen real.

@@ -22,6 +22,11 @@ nova/cap/__init__.py
 nova/cap/db_sqlite.py
 nova/cap/html_cap.py
 nova/cap/http_cap.py
+nova/cap/net/__init__.py
+nova/cap/net/base.py
+nova/cap/net/node.py
+nova/cap/net/node_fetch.mjs
+nova/cap/net/py.py
 nova/ir/__init__.py
 nova/ir/emit.py
 nova/ir/nodes.py
@@ -38,6 +43,7 @@ tests/test_checker.py
 tests/test_cli_v013.py
 tests/test_db_ir.py
 tests/test_llvm_native_v014.py
+tests/test_net_driver_v015.py
 tests/test_roundtrip.py
 tests/test_runtime.py
 tests/test_toon.py
