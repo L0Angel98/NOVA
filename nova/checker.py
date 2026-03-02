@@ -264,6 +264,8 @@ class Checker:
             method_expr = stmt["method"]
             method_name = self._extract_route_method_name(method_expr, env, f"{path}.method")
             if method_name is not None:
+                aliases = {"DEL": "DELETE", "PAT": "PATCH", "OPT": "OPTIONS", "HED": "HEAD"}
+                method_name = aliases.get(method_name, method_name)
                 allowed = {"GET", "POST", "PUT", "PATCH", "DELETE"}
                 if method_name not in allowed:
                     self._error("NVC303", f"{path}.method", f"Unsupported method '{method_name}'")
@@ -416,6 +418,8 @@ class Checker:
                 return awaited.args[0]
             self._error("NVC130", path, "awt expects asy<T>")
             return TYPE_UNKNOWN
+        if typ == "CapExpr":
+            return self._check_expr(expr["expression"], env, f"{path}.expression", allow_unresolved_ident)
         if typ == "AsyncExpr":
             block_type = self._check_block(expr.get("body", []), Env(env), f"{path}.body")
             if block_type.kind == "void":

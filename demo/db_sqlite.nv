@@ -1,0 +1,11 @@
+mdl db_sqlite v"0.1.3" rst<any, err> {
+  let h = db.opn("out/demo.db")
+  db.qry(h, "create table if not exists usr (id integer primary key, nm text)")
+  db.qry(h, "delete from usr")
+  db.qry(h, "insert into usr (nm) values (?)", ["ada"])
+  db.qry(h, "insert into usr (nm) values (?)", ["lin"])
+  let rows = db.qry(h, "select id, nm from usr order by id asc")
+  db.cls(h)
+  rst.ok(rows)
+}
+

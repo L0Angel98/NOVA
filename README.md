@@ -1,171 +1,88 @@
-﻿# NOVA v0.1
+# NOVA v0.1.3
 
-NOVA es un DSL IA-first para APIs y scripting, con foco en:
-
-- Menos tokens
-- Menos ambiguedad
-- Flujo declarativo (rutas, DB IR, capacidades)
-- Formatos `json` y `toon`
-
-toon: formato tabular comprimido nativo de NOVA. Alternativa a JSON
-disenada para agentes IA — menos tokens, estructura fija, parseable
-sin librerias externas.
-
-Estado: `v0.1` estable para uso de desarrollo y demos.
+NOVA es un DSL IA-first para APIs y scripting con claves cortas y flujo declarativo.
 
 ## Instalacion
 
-Requisitos:
-
-- Python >= 3.10
-- pip >= 22 (recomendado: actualizar con python -m pip install --upgrade pip)
-
-El proyecto usa pyproject.toml como sistema de build.
-No se requiere setup.py.
-
-Instalacion de desarrollo (recomendada):
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate      # Windows
-source .venv/bin/activate   # macOS/Linux
-pip install -e .
-nova --help
-```
-
-Instalacion global (sin venv):
-
 ```bash
 pip install -e .
-nova --help
+nova --version
 ```
 
-Nota: si pip install -e . falla, ver seccion Troubleshooting.
+## v0.1.3
 
-## Uso del CLI
+### Backends
 
-Comandos visibles:
+- `interp`: backend por defecto para `run` y `serve`.
+- `llvm`: AOT para subset (genera binario nativo con `nova-llvm`).
+- `go`: stub pluggable para siguiente iteracion.
 
-- Parse: `nova parse archivo.nv`
-- Format: `nova fmt archivo.nv`
-- Type check: `nova check archivo.nv`
-- Runtime HTTP: `nova serve demo/app.nv --cap db`
-- Agent Context:
-  - `nova agt init --root .`
-  - `nova agt sync --root .`
-  - `nova agt chk --root .`
-  - `nova agt pack --root . --output demo/agent.pack.toon`
-- Tests: `python -m unittest discover -s tests -v`
-
-El modo modulo de Python sigue siendo compatible para backward compatibility.
-
-## Demo
-
-Archivo de demo: `demo/app.nv`
-
-Incluye:
-
-- CRUD `json`
-- Endpoints `toon`
-- DB IR declarativo (`tb`, `whe`, `lim`, `ord`)
-- Enforcement real de `cap`
-
-Nota de sintaxis:
-
-- Los strings son `"..."` sin prefijo. `str"..."` fue removido.
-- Los metodos HTTP (`GET`, `POST`, `PUT`, `DEL`, `PAT`, `OPT`, `HED`) son keywords sin comillas.
-- `nova fmt` normaliza ambas convenciones automaticamente.
-- Alias estandar de contexto: `ctx.q` (query), `ctx.p` (params), `ctx.h` (headers), `ctx.b` (body).
-- Ejemplo:
-
-```nova
-rte "/items" POST json {
-  tb items
-  grd ctx.b, ctx.b.name : "BAD_REQUEST"
-  rst.ok(db.create(ctx.b))
-}
-```
-
-## Troubleshooting
-
-Si `nova` no se encuentra:
-
-- activa el entorno virtual donde instalaste el paquete
-- verifica instalacion con `pip show nova-lang`
-- reinstala en modo editable con `pip install -e .`
-
-Si `pip install -e .` falla con `Cannot set --home and --prefix together`:
-
-- ejecuta `pip config debug` para ubicar el `pip.ini`/`pip.cfg` activo
-- ejecuta `pip config list` y busca claves `home`, `prefix` o `target`
-- elimina esas claves del bloque `[global]` (o ejecuta `pip config unset global.target` si aplica)
-- vuelve a correr `pip install -e .`
-
-## Documentacion de release
-
-- Especificacion: `SPEC.md`
-- Ejemplos: `EXAMPLES.md`
-- Notas tecnicas: `NOTES.md`
-- Roadmap v0.2: `ROADMAP_v0.2.md`
-- Limitaciones conocidas: `LIMITATIONS.md`
-- Metricas de release: `METRICS.md`
-
-## Alcance de esta fase de release
-
-Esta fase pule DX + estabilidad + documentacion.
-
-No agrega features nuevas de lenguaje.
-
-## How to test
+Comandos:
 
 ```bash
-pip install -e .
-nova --help
-nova fmt demo/app.nv
-nova agt pack --root . --output demo/agent.pack.toon
+nova run demo/db_sqlite.nv --b interp --cap db
+nova build demo/hello_llvm.nv --b llvm
 ```
 
-## Runtime Error Format (.toon)
+### Capabilities
 
-Errores de ruta en DSL usan `err { code, msg }` dentro de `rst`.
-El runtime tambien emite errores estructurados en TOON para fallos de parse/validacion:
+- `net`: `http.get(url, h?, t?) -> {st, hd, bd}`
+- `html`: `html.tte(html)` y `html.sct(html, css)`
+- `db`: `db.opn(path)`, `db.qry(h, sql, args?)`, `db.cls(h)` (SQLite db0)
 
-Cuando el runtime encuentra un `.nv` invalido, devuelve error estructurado en TOON:
+Ejemplos:
 
-```toon
-@toon v1
-@type error
-|k|v|
-|"line"|"12"|
-|"token"|"whe"|
-|"expected"|"tb antes de whe"|
-|"file"|"app.nv"|
-|"severity"|"error"|
+```bash
+nova serve demo/scrape_profile.nv --cap net
+nova run demo/db_sqlite.nv --cap db
 ```
 
-El agente debe esperar y parsear este formato en el loop de iteracion.
+### Agent Context Index
 
-## Changelog
+`agt` ahora usa `.nova/idx.toon`.
 
-### v0.1.0 — Release inicial
-- Parser (.nv -> AST JSON)
-- Formatter canonico (nova fmt)
-- Type checker estatico (nova check)
-- Runtime HTTP (nova serve)
-- Agent Context system (nova agt)
-- Formatos de respuesta: json y toon
-- Enforcement de capabilities (cap)
-- DB IR declarativo (tb, whe, lim, ord)
+```bash
+nova agt init --root .
+nova agt sync --root .
+```
 
-### v0.1.1 — Ajuste de sintaxis de strings
-- `str"..."` deja de ser obligatorio en codigo fuente.
-- `nova fmt` normaliza strings a `"..."`.
+Estructura compacta del index:
 
-### v0.1.2 — Refactor sintaxis IA-first
-- str"..." removido del spec. nova fmt lo normaliza automaticamente. El runtime lo acepta pero no es sintaxis valida nueva.
-- Metodos HTTP promovidos a keywords (`GET`, `POST`, `PUT`, `DEL`, `PAT`, `OPT`, `HED`)
-- `rst<any, err>` declarado una vez en firma de modulo
-- `cap [db]` inferido automaticamente desde `tb`
-- `grd` reemplaza cascadas de validacion de nulos `BAD_REQUEST`
-- Version del modulo en firma con `v"x.x.x"`
-- Formato de error del runtime estandarizado en `.toon`
+- `v`, `rt`, `sum`, `api`, `cap`, `m`, `dep`, `chg`, `ts`
+
+## Demos v0.1.3
+
+### 1) LLVM subset
+
+```bash
+nova build demo/hello_llvm.nv --b llvm
+./out/hello_llvm      # Windows: .\out\hello_llvm.exe
+```
+
+Salida esperada: JSON estatico (`hello nova`).
+
+### 2) Scraping profile (serve/interp)
+
+```bash
+nova serve demo/scrape_profile.nv --cap net --port 8099
+curl http://127.0.0.1:8099/profile
+```
+
+### 3) SQLite db0 (run/interp)
+
+```bash
+nova run demo/db_sqlite.nv --cap db
+```
+
+## Limitaciones LLVM v0.1.3
+
+- Subset soportado: `let`, literales `json`, `rst.ok` estatico y `print` simple.
+- No compila aun rutas HTTP completas ni capacidades en binario AOT.
+- El backend `go` queda como interfaz/stub.
+
+## Testing
+
+```bash
+python -m unittest discover -s tests -v
+```
+

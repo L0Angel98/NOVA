@@ -10,8 +10,10 @@ import time
 import traceback
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
-from urllib import request as urllib_request
 
+from .cap.db_sqlite import DbSqliteCap, DbSqliteError
+from .cap.html_cap import html_sct, html_tte
+from .cap.http_cap import HttpCapError, http_get
 from .db_ir import (
     DbIr,
     DbIrError,
@@ -40,9 +42,16 @@ ERROR_STATUS_BY_CODE = {
     "NOT_IMPLEMENTED": 501,
     "CAP_FORBIDDEN": 403,
     "CAP_DECLARATION_REQUIRED": 403,
+    "NET_REQ": 502,
+    "NET_INPUT": 400,
+    "DB_INPUT": 400,
+    "DB_OPEN": 500,
+    "DB_QRY": 500,
+    "DB_CLOSE": 500,
+    "DB_HANDLE": 400,
 }
 
-ALLOWED_CAPS = {"net", "db", "env", "fs"}
+ALLOWED_CAPS = {"net", "html", "db", "env", "fs"}
 
 
 class RuntimeBuildError(ValueError):
@@ -261,6 +270,27 @@ class DbFacade:
     def plan(self) -> Dict[str, Any]:
         return self.runtime._db_plan_dict(self.route_scope, self.query)
 
+    def opn(self, path: Any) -> str:
+        self.runtime._require_cap(self.route_scope, "db", "db.opn")
+        try:
+            return self.runtime.db0.opn(path)
+        except DbSqliteError as exc:
+            raise RuntimeExecError(exc.code, exc.msg, status=ERROR_STATUS_BY_CODE.get(exc.code, 500)) from exc
+
+    def qry(self, handle: Any, sql: Any, args: Any = None) -> Any:
+        self.runtime._require_cap(self.route_scope, "db", "db.qry")
+        try:
+            return self.runtime.db0.qry(handle, sql, args)
+        except DbSqliteError as exc:
+            raise RuntimeExecError(exc.code, exc.msg, status=ERROR_STATUS_BY_CODE.get(exc.code, 500)) from exc
+
+    def cls(self, handle: Any) -> bool:
+        self.runtime._require_cap(self.route_scope, "db", "db.cls")
+        try:
+            return self.runtime.db0.cls(handle)
+        except DbSqliteError as exc:
+            raise RuntimeExecError(exc.code, exc.msg, status=ERROR_STATUS_BY_CODE.get(exc.code, 500)) from exc
+
 
 class EnvFacade:
     def __init__(self, runtime: "NovaRuntime", route_scope: Scope) -> None:
@@ -307,41 +337,46 @@ class NetFacade:
         self.runtime = runtime
         self.route_scope = route_scope
 
-    def get(self, url: Any, timeout: Any = 5) -> Dict[str, Any]:
+    def get(self, url: Any, h: Any = None, t: Any = None) -> Dict[str, Any]:
         self.runtime._require_cap(self.route_scope, "net", "net.get")
-        return self._request("GET", url, None, timeout)
-
-    def post(self, url: Any, payload: Any = None, timeout: Any = 5) -> Dict[str, Any]:
-        self.runtime._require_cap(self.route_scope, "net", "net.post")
-        return self._request("POST", url, payload, timeout)
-
-    def _request(self, method: str, url: Any, payload: Any, timeout: Any) -> Dict[str, Any]:
         try:
-            timeout_num = float(timeout)
-        except Exception as exc:
-            raise RuntimeExecError("BAD_REQUEST", f"invalid timeout value: {timeout}") from exc
+            return http_get(url, h, t)
+        except HttpCapError as exc:
+            raise RuntimeExecError(exc.code, exc.msg, status=ERROR_STATUS_BY_CODE.get(exc.code, 500)) from exc
 
-        target = str(url)
-        data = None
-        headers = {"User-Agent": "nova-runtime/0.1"}
-        if payload is not None:
-            data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-            headers["Content-Type"] = "application/json; charset=utf-8"
 
-        req = urllib_request.Request(target, data=data, method=method, headers=headers)
+class HttpFacade:
+    def __init__(self, runtime: "NovaRuntime", route_scope: Scope) -> None:
+        self.runtime = runtime
+        self.route_scope = route_scope
+
+    def get(self, url: Any, h: Any = None, t: Any = None) -> Dict[str, Any]:
+        self.runtime._require_cap(self.route_scope, "net", "http.get")
         try:
-            with urllib_request.urlopen(req, timeout=timeout_num) as res:
-                raw = res.read()
-                text = raw.decode("utf-8", errors="replace")
-                return {"status": res.status, "body": text, "headers": dict(res.headers.items())}
-        except Exception as exc:
-            raise RuntimeExecError("BAD_REQUEST", f"net request failed: {exc}") from exc
+            return http_get(url, h, t)
+        except HttpCapError as exc:
+            raise RuntimeExecError(exc.code, exc.msg, status=ERROR_STATUS_BY_CODE.get(exc.code, 500)) from exc
+
+
+class HtmlFacade:
+    def __init__(self, runtime: "NovaRuntime", route_scope: Scope) -> None:
+        self.runtime = runtime
+        self.route_scope = route_scope
+
+    def tte(self, value: Any) -> str:
+        self.runtime._require_cap(self.route_scope, "html", "html.tte")
+        return html_tte(value)
+
+    def sct(self, value: Any, css: Any) -> List[str]:
+        self.runtime._require_cap(self.route_scope, "html", "html.sct")
+        return html_sct(value, css)
 
 
 class NovaRuntime:
     def __init__(self, ast: Dict[str, Any], capabilities: Optional[List[str] | set[str] | tuple[str, ...]] = None) -> None:
         self.ast = ast
         self.db = InMemoryDbIrAdapter()
+        self.db0 = DbSqliteCap()
         self.routes: List[RouteDef] = []
         self.global_scope = Scope()
         self._request_counter = 0
@@ -417,6 +452,10 @@ class NovaRuntime:
             "method": method,
             "path": path,
             "timestamp_ms": int(time.time() * 1000),
+            "q": query,
+            "p": params,
+            "h": headers,
+            "b": body,
         }
 
         request = RequestContext(
@@ -430,7 +469,7 @@ class NovaRuntime:
             ctx=ctx,
         )
 
-        missing_route_caps = sorted([cap for cap in route.required_caps if cap not in self.granted_caps])
+        missing_route_caps = sorted([cap for cap in route.required_caps if not self._is_cap_granted(cap)])
         if missing_route_caps:
             status, payload = self._error_payload(
                 "CAP_FORBIDDEN",
@@ -557,6 +596,8 @@ class NovaRuntime:
         scope.define("env", EnvFacade(self, scope))
         scope.define("fs", FsFacade(self, scope))
         scope.define("net", NetFacade(self, scope))
+        scope.define("http", HttpFacade(self, scope))
+        scope.define("html", HtmlFacade(self, scope))
         scope.define("db_ir", {})
 
         value = self._exec_block(route.body, scope, query)
@@ -759,6 +800,8 @@ class NovaRuntime:
             return bool(expr["value"])
         if typ == "NullLiteral":
             return None
+        if typ == "CapExpr":
+            return self._eval_expr(expr["expression"], scope, query)
         if typ == "Identifier":
             name = expr["name"]
             try:
@@ -1049,7 +1092,12 @@ class NovaRuntime:
             declared = set()
         declared_set = set(declared) if isinstance(declared, (set, list, tuple, frozenset)) else set()
 
-        if cap not in declared_set:
+        declared_ok = cap in declared_set
+        # v0.1.3 compatibility: html helpers can run under net for scraping MVP.
+        if cap == "html" and "net" in declared_set:
+            declared_ok = True
+
+        if not declared_ok:
             raise RuntimeExecError(
                 "CAP_DECLARATION_REQUIRED",
                 f"{operation} requires cap '{cap}' declared via cap [{cap}]",
@@ -1057,7 +1105,9 @@ class NovaRuntime:
                 details={"required_cap": cap, "declared_caps": sorted(declared_set)},
             )
 
-        if cap not in self.granted_caps:
+        granted_ok = self._is_cap_granted(cap)
+
+        if not granted_ok:
             raise RuntimeExecError(
                 "CAP_FORBIDDEN",
                 f"{operation} blocked: runtime missing cap '{cap}'",
@@ -1065,13 +1115,22 @@ class NovaRuntime:
                 details={"required_cap": cap, "granted_caps": sorted(self.granted_caps)},
             )
 
+    def _is_cap_granted(self, cap: str) -> bool:
+        if cap in self.granted_caps:
+            return True
+        if cap == "html" and "net" in self.granted_caps:
+            return True
+        return False
+
     def _expect_route_method(self, expr: Dict[str, Any]) -> str:
         if expr["type"] == "StringLiteral":
             raise RuntimeBuildError(
                 "rte method must be keyword (GET/POST/PUT/PATCH/DELETE), not string literal"
             )
         if expr["type"] == "Identifier":
-            method = expr["name"]
+            method = expr["name"].upper()
+            aliases = {"DEL": "DELETE", "PAT": "PATCH", "OPT": "OPTIONS", "HED": "HEAD"}
+            method = aliases.get(method, method)
             allowed = {"GET", "POST", "PUT", "PATCH", "DELETE"}
             if method not in allowed:
                 raise RuntimeBuildError(f"Unsupported rte method '{method}'")

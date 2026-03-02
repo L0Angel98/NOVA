@@ -1,28 +1,43 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 from pathlib import Path
 import sys
 
-from .ast_utils import ast_to_json
 from .agent_context import (
     AgentContextError,
     check_agent,
-    default_agent_dictionary_path,
-    default_agent_guide_md_path,
     default_agent_path,
     init_agent_knowledge,
     pack_agent,
     sync_agent,
 )
-from .checker import format_diagnostics, check_ast
+from .ast_utils import ast_to_json
+from .backends import BackendError, get_backend
+from .checker import check_ast, format_diagnostics
 from .formatter import format_nova
+from .ir import IrEmitError, emit_ir, ir_to_json
 from .parser import parse_nova
 from .runtime import RuntimeBuildError, run_server
+from .version import VERSION
 
 
 def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _write_ir(src_path: Path, out_dir: Path) -> tuple[Path, object]:
+    source = _read_text(src_path)
+    ast = parse_nova(source)
+    ir = emit_ir(ast, source_path=src_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ir_path = out_dir / f"{src_path.stem}.ir.json"
+    ir_path.write_text(ir_to_json(ir) + "\n", encoding="utf-8")
+    return ir_path, ir
+
+
+def _caps(args: argparse.Namespace) -> set[str]:
+    return {str(item).strip() for item in getattr(args, "capabilities", []) if str(item).strip() != ""}
 
 
 def cmd_parse(args: argparse.Namespace) -> int:
@@ -71,7 +86,44 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_build(args: argparse.Namespace) -> int:
+    src_path = Path(args.input).resolve()
+    out_dir = Path(args.out_dir).resolve()
+    caps = _caps(args)
+
+    try:
+        ir_path, ir = _write_ir(src_path, out_dir)
+        backend = get_backend(args.backend)
+        result = backend.build(ir=ir, ir_path=ir_path, src_path=src_path, out_dir=out_dir, caps=caps)
+    except (IrEmitError, BackendError, RuntimeError, ValueError) as exc:
+        sys.stdout.write(f"[NVB100] build: {exc}\n")
+        return 2
+
+    sys.stdout.write(f"build ok backend={result.backend} ir={result.ir_path} out={result.artifact}\n")
+    return 0
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    src_path = Path(args.input).resolve()
+    out_dir = Path(args.out_dir).resolve()
+    caps = _caps(args)
+
+    try:
+        ir_path, ir = _write_ir(src_path, out_dir)
+        backend = get_backend(args.backend)
+        code = backend.run(ir=ir, ir_path=ir_path, src_path=src_path, out_dir=out_dir, caps=caps)
+    except (IrEmitError, BackendError, RuntimeError, ValueError) as exc:
+        sys.stdout.write(f"[NVB101] run: {exc}\n")
+        return 2
+
+    return int(code)
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
+    if args.backend != "interp":
+        sys.stdout.write("[NVR099] serve: only --b interp is supported in v0.1.3\n")
+        return 2
+
     try:
         server = run_server(args.entry, host=args.host, port=args.port, capabilities=args.capabilities)
     except RuntimeBuildError as exc:
@@ -95,7 +147,6 @@ def cmd_serve(args: argparse.Namespace) -> int:
 def cmd_agt_pack(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     agent_path = Path(args.file).resolve() if args.file else default_agent_path(root)
-    output_path = Path(args.output).resolve() if args.output else None
 
     try:
         result = pack_agent(root, agent_path)
@@ -103,7 +154,8 @@ def cmd_agt_pack(args: argparse.Namespace) -> int:
         sys.stdout.write(f"[NVA100] agt pack: {exc}\n")
         return 2
 
-    if output_path is not None:
+    if args.output:
+        output_path = Path(args.output).resolve()
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(result.text, encoding="utf-8")
         sys.stdout.write(f"packed rows={result.row_count} -> {output_path}\n")
@@ -123,7 +175,7 @@ def cmd_agt_sync(args: argparse.Namespace) -> int:
         return 2
 
     sys.stdout.write(
-        f"sync ok file={result.path} manual={result.manual_count} auto={result.auto_count} total={result.total_count}\n"
+        f"sync ok file={result.path} files={result.file_count} routes={result.route_count} caps={result.cap_count}\n"
     )
     return 0
 
@@ -149,14 +201,12 @@ def cmd_agt_chk(args: argparse.Namespace) -> int:
 
 def cmd_agt_init(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
-    dictionary_path = Path(args.dict_file).resolve() if args.dict_file else default_agent_dictionary_path(root)
-    guide_path = Path(args.md_file).resolve() if args.md_file else default_agent_guide_md_path(root)
 
     try:
-        result = init_agent_knowledge(
+        report = init_agent_knowledge(
             root,
-            dictionary_path,
-            guide_path,
+            root / "agent.dictionary.toon",
+            root / "NOVA_LANGUAGE.md",
             force=bool(args.force),
         )
     except AgentContextError as exc:
@@ -166,16 +216,14 @@ def cmd_agt_init(args: argparse.Namespace) -> int:
         sys.stdout.write(f"[NVA103] agt init: {exc}\n")
         return 2
 
-    dict_status = "written" if result.dictionary_written else "kept"
-    md_status = "written" if result.guide_written else "kept"
-    sys.stdout.write(
-        f"init ok dict={result.dictionary_path} ({dict_status}) md={result.guide_path} ({md_status}) rows={result.dictionary_rows}\n"
-    )
+    sys.stdout.write(f"init ok idx={report.agent_path}\n")
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="nova", description="NOVA v0.1 parser + formatter + checker + runtime")
+    parser = argparse.ArgumentParser(prog="nova", description=f"NOVA v{VERSION} parser + runtime + backends")
+    parser.add_argument("--version", action="version", version=f"nova {VERSION}")
+
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_parse = sub.add_parser("parse", help="Parse .nv source and output typed AST JSON")
@@ -192,44 +240,69 @@ def build_parser() -> argparse.ArgumentParser:
     p_check.add_argument("input", help="Input .nv file")
     p_check.set_defaults(func=cmd_check)
 
+    p_build = sub.add_parser("build", help="Compile .nv to backend artifact")
+    p_build.add_argument("input", help="Input .nv file")
+    p_build.add_argument("--b", dest="backend", default="interp", choices=["llvm", "go", "interp"], help="Backend")
+    p_build.add_argument("--out-dir", default="out", help="Output directory (default: out)")
+    p_build.add_argument(
+        "--cap",
+        dest="capabilities",
+        action="append",
+        default=[],
+        help="Grant static capability (repeatable): net|html|db|env|fs",
+    )
+    p_build.set_defaults(func=cmd_build)
+
+    p_run = sub.add_parser("run", help="Run .nv using selected backend")
+    p_run.add_argument("input", help="Input .nv file")
+    p_run.add_argument("--b", dest="backend", default="interp", choices=["llvm", "go", "interp"], help="Backend")
+    p_run.add_argument("--out-dir", default="out", help="Output directory (default: out)")
+    p_run.add_argument(
+        "--cap",
+        dest="capabilities",
+        action="append",
+        default=[],
+        help="Grant static capability (repeatable): net|html|db|env|fs",
+    )
+    p_run.set_defaults(func=cmd_run)
+
     p_serve = sub.add_parser("serve", help="Run NOVA HTTP runtime")
     p_serve.add_argument("entry", help="Entry .nv app file")
     p_serve.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
     p_serve.add_argument("--port", type=int, default=8080, help="Bind port (default: 8080)")
+    p_serve.add_argument("--b", dest="backend", default="interp", choices=["interp", "llvm", "go"], help="Backend")
     p_serve.add_argument(
         "--cap",
         dest="capabilities",
         action="append",
         default=[],
-        help="Grant static capability (repeatable): net|db|env|fs",
+        help="Grant static capability (repeatable): net|html|db|env|fs",
     )
     p_serve.set_defaults(func=cmd_serve)
 
-    p_agt = sub.add_parser("agt", help="Agent Context system")
+    p_agt = sub.add_parser("agt", help="Agent context index (.nova/idx.toon)")
     agt_sub = p_agt.add_subparsers(dest="agt_command", required=True)
 
-    p_agt_pack = agt_sub.add_parser("pack", help="Build compact AI context payload from agent.toon")
-    p_agt_pack.add_argument("--root", default=".", help="Project root (default: current dir)")
-    p_agt_pack.add_argument("--file", help="Path to agent.toon (default: <root>/agent.toon)")
-    p_agt_pack.add_argument("--output", help="Write packed payload to file (default: stdout)")
-    p_agt_pack.set_defaults(func=cmd_agt_pack)
+    p_agt_init = agt_sub.add_parser("init", help="Create .nova/idx.toon")
+    p_agt_init.add_argument("--root", default=".", help="Project root (default: current dir)")
+    p_agt_init.add_argument("--force", action="store_true", help="Overwrite idx.toon if it already exists")
+    p_agt_init.set_defaults(func=cmd_agt_init)
 
-    p_agt_sync = agt_sub.add_parser("sync", help="Sync agent.toon auto fields from project snapshot")
+    p_agt_sync = agt_sub.add_parser("sync", help="Sync .nova/idx.toon from project snapshot")
     p_agt_sync.add_argument("--root", default=".", help="Project root (default: current dir)")
-    p_agt_sync.add_argument("--file", help="Path to agent.toon (default: <root>/agent.toon)")
+    p_agt_sync.add_argument("--file", help="Path to idx.toon (default: <root>/.nova/idx.toon)")
     p_agt_sync.set_defaults(func=cmd_agt_sync)
 
-    p_agt_chk = agt_sub.add_parser("chk", help="Validate agent.toon and detect drift")
+    p_agt_chk = agt_sub.add_parser("chk", help="Validate .nova/idx.toon")
     p_agt_chk.add_argument("--root", default=".", help="Project root (default: current dir)")
-    p_agt_chk.add_argument("--file", help="Path to agent.toon (default: <root>/agent.toon)")
+    p_agt_chk.add_argument("--file", help="Path to idx.toon (default: <root>/.nova/idx.toon)")
     p_agt_chk.set_defaults(func=cmd_agt_chk)
 
-    p_agt_init = agt_sub.add_parser("init", help="Generate NOVA agent dictionary (.toon) and language guide (.md)")
-    p_agt_init.add_argument("--root", default=".", help="Project root (default: current dir)")
-    p_agt_init.add_argument("--dict-file", help="Output TOON dictionary file (default: <root>/agent.dictionary.toon)")
-    p_agt_init.add_argument("--md-file", help="Output language guide markdown file (default: <root>/NOVA_LANGUAGE.md)")
-    p_agt_init.add_argument("--force", action="store_true", help="Overwrite files if they already exist")
-    p_agt_init.set_defaults(func=cmd_agt_init)
+    p_agt_pack = agt_sub.add_parser("pack", help="Emit compact context payload")
+    p_agt_pack.add_argument("--root", default=".", help="Project root (default: current dir)")
+    p_agt_pack.add_argument("--file", help="Path to idx.toon (default: <root>/.nova/idx.toon)")
+    p_agt_pack.add_argument("--output", help="Write packed payload to file (default: stdout)")
+    p_agt_pack.set_defaults(func=cmd_agt_pack)
 
     return parser
 
@@ -245,3 +318,4 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

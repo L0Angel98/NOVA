@@ -1,4 +1,4 @@
-# NOVA Language Specification v0.1.2
+# NOVA Language Specification v0.1.3
 
 Estado: contrato normativo minimo para v0.1.
 Alcance: DSL IA-first para APIs y scripting.
@@ -6,7 +6,7 @@ No alcance: detalles internos de runtime, transporte HTTP real y motor DB fisico
 
 ## Overview / Goals
 
-NOVA v0.1.2 define una superficie estable para codigo orientado a IA:
+NOVA v0.1.3 define una superficie estable para codigo orientado a IA:
 
 - Menos tokens por intencion.
 - Menos ambiguedad sintactica.
@@ -14,11 +14,12 @@ NOVA v0.1.2 define una superficie estable para codigo orientado a IA:
 - Flujo declarativo para rutas y DB IR.
 - Salida consistente mediante `rst` y `err`.
 
-## Versioning (v0.1.2 notes)
+## Versioning (v0.1.3 notes)
 
 - `v0.1.0`: base de lenguaje (`rte`, `tb/whe/lim/ord`, `cap`, `rst/err`).
 - `v0.1.1`: `str"..."` deja de ser sintaxis canonica.
 - `v0.1.2`: breaking change: metodos HTTP son keywords sin comillas.
+- `v0.1.3`: IR estable + backends pluggable (`interp`, `llvm`, `go` stub), caps `http/html/db` y agent index `.nova/idx.toon`.
 
 ## Lexical structure
 
@@ -29,25 +30,26 @@ NOVA v0.1.2 define una superficie estable para codigo orientado a IA:
 
 ## Keywords (reserved)
 
-Keywords reservadas en v0.1.2:
+Keywords reservadas en v0.1.3:
 
 - Control: `let`, `if`, `els`, `match`, `asy`, `awt`
 - Modulo/API: `mdl`, `grd`, `rte`, `cap`, `rst`, `err`
 - DB IR: `tb`, `whe`, `lim`, `ord`
 - Formatos/literales: `json`, `toon`, `tru`, `fal`, `nul`
-- HTTP methods: `GET`, `POST`, `PUT`, `DEL`, `PAT`, `OPT`, `HED`
+- HTTP methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE` (aliases legacy: `DEL`, `PAT`, `OPT`, `HED`)
 
 Reglas:
 
 - `mdl` y `grd` son keywords reservadas.
 - Ninguna keyword reservada puede usarse como identificador.
 
-## Runtime namespaces & builtins (standard v0.1)
+## Runtime namespaces & builtins (standard v0.1.3)
 
 Elementos estandar del runtime:
 
 - Namespaces reservados: `ctx`, `db`.
 - Builtin: `to_num(value)`.
+- Caps runtime: `http.get`, `html.tte`, `html.sct`, `db.opn/qry/cls`.
 
 ## Lexical structure
 
@@ -56,7 +58,7 @@ Elementos estandar del runtime:
 
 ## HTTP routing (rte + methods)
 
-Forma canonica v0.1.2:
+Forma canonica v0.1.3:
 
 ```nova
 rte GET "/path" {

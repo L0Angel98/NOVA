@@ -7,8 +7,10 @@ from .parser import parse_nova
 from .runtime import NovaRuntime, run_server
 from .toon import decode_toon, encode_toon
 from .agent_context import check_agent, pack_agent, sync_agent
+from .version import VERSION
 
 __all__ = [
+    "VERSION",
     "parse_nova",
     "format_nova",
     "check_ast",

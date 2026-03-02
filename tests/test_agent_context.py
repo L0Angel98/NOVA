@@ -1,87 +1,80 @@
-﻿import shutil
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
 
-from nova.agent_context import (
-    check_agent,
-    default_agent_dictionary_path,
-    default_agent_guide_md_path,
-    init_agent_knowledge,
-    pack_agent,
-    sync_agent,
-)
+from nova.agent_context import check_agent, default_agent_path, init_agent_knowledge, pack_agent, sync_agent
+from nova.toon import decode_toon
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class NovaAgentContextTests(unittest.TestCase):
-    def test_init_creates_dictionary_and_language_md(self) -> None:
+    def test_init_creates_idx_toon(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            report = init_agent_knowledge(
-                root,
-                default_agent_dictionary_path(root),
-                default_agent_guide_md_path(root),
-            )
-            self.assertTrue(report.dictionary_written)
-            self.assertTrue(report.guide_written)
-            self.assertGreater(report.dictionary_rows, 0)
-            self.assertTrue(report.dictionary_path.exists())
-            self.assertTrue(report.guide_path.exists())
-            self.assertIn("@toon v1", report.dictionary_path.read_text(encoding="utf-8"))
-            self.assertIn("NOVA Language Notes", report.guide_path.read_text(encoding="utf-8"))
+            (root / "README.md").write_text("# demo\n", encoding="utf-8")
+            report = init_agent_knowledge(root, root / "agent.dictionary.toon", root / "NOVA_LANGUAGE.md")
 
-    def test_sync_creates_auto_keys_and_preserves_manual(self) -> None:
+            self.assertTrue(report.agent_path.exists())
+            self.assertEqual(report.agent_path, default_agent_path(root))
+
+            value = decode_toon(report.agent_path.read_text(encoding="utf-8"))
+            self.assertTrue(isinstance(value, dict))
+            for key in ["v", "rt", "sum", "api", "cap", "m", "dep", "chg", "ts"]:
+                self.assertIn(key, value)
+
+    def test_sync_updates_index_and_changelog(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            (root / "SPEC.md").write_text("spec", encoding="utf-8")
-            (root / "a.nv").write_text('rte str"/x" str"GET" json: rst<any, err> { rst.ok(str"ok") }', encoding="utf-8")
-            (root / "tests").mkdir()
-            (root / "tests" / "test_a.py").write_text("def test_a():\n    pass\n", encoding="utf-8")
-            (root / "agent.toon").write_text(
-                """toon agent_context {
-| key | value |
-| project_name | \"TMP\" |
-| custom_note | \"keep\" |
+            (root / "README.md").write_text("# demo\n", encoding="utf-8")
+            (root / "demo.nv").write_text(
+                """
+mdl x v"0.1.3" rst<any, err> {
+  rte "/p" GET json {
+    cap [net]
+    rst.ok({ok: tru})
+  }
 }
-""",
+""".strip()
+                + "\n",
                 encoding="utf-8",
             )
 
-            rst = sync_agent(root, root / "agent.toon")
-            self.assertGreater(rst.auto_count, 0)
+            idx = default_agent_path(root)
+            sync_1 = sync_agent(root, idx)
+            sync_2 = sync_agent(root, idx)
+            self.assertGreaterEqual(sync_1.file_count, 1)
+            self.assertGreaterEqual(sync_1.route_count, 1)
+            self.assertIn("net", decode_toon(idx.read_text(encoding="utf-8"))["cap"])
+            self.assertEqual(sync_2.path, idx)
 
-            chk = check_agent(root, root / "agent.toon")
-            self.assertTrue(chk.ok)
+            chk = check_agent(root, idx)
+            self.assertTrue(chk.ok, chk.issues)
 
-            packed = pack_agent(root, root / "agent.toon")
-            self.assertIn("@toon v1", packed.text)
-            self.assertIn("custom_note", packed.text)
-
-    def test_chk_detects_drift(self) -> None:
+    def test_pack_outputs_compact_payload(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            (root / "SPEC.md").write_text("spec", encoding="utf-8")
-            (root / "a.nv").write_text('rte str"/x" str"GET" json: rst<any, err> { rst.ok(str"ok") }', encoding="utf-8")
-            agent = root / "agent.toon"
-
-            sync_agent(root, agent)
-            (root / "b.md").write_text("new", encoding="utf-8")
-
-            chk = check_agent(root, agent)
-            self.assertFalse(chk.ok)
-            self.assertTrue(any("sys.snapshot.file_count" in issue for issue in chk.issues))
+            (root / "README.md").write_text("# demo\n", encoding="utf-8")
+            sync_agent(root, default_agent_path(root))
+            packed = pack_agent(root, default_agent_path(root))
+            self.assertIn("@toon v1", packed.text)
+            self.assertGreaterEqual(packed.row_count, 1)
 
     def test_cli_agt_commands(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            shutil.copy(ROOT / "agent.toon", root / "agent.toon")
-            shutil.copy(ROOT / "SPEC.md", root / "SPEC.md")
-            shutil.copy(ROOT / "EXAMPLES.md", root / "EXAMPLES.md")
-            (root / "app.nv").write_text('rte str"/x" str"GET" json: rst<any, err> { rst.ok(str"ok") }', encoding="utf-8")
+            (root / "README.md").write_text("# demo\n", encoding="utf-8")
+            (root / "app.nv").write_text(
+                """
+mdl x v"0.1.3" rst<any, err> {
+  rte "/x" GET json { rst.ok({ok: tru}) }
+}
+""".strip()
+                + "\n",
+                encoding="utf-8",
+            )
 
             init_proc = subprocess.run(
                 ["python", "-m", "nova", "agt", "init", "--root", str(root)],

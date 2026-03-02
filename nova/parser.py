@@ -312,6 +312,9 @@ class Parser:
     def _parse_unary(self) -> Dict[str, Any]:
         self._skip_newlines()
 
+        if self._match_keyword("cap"):
+            return {"type": "CapExpr", "expression": self._parse_unary()}
+
         if self._match_keyword("awt"):
             return {"type": "AwaitExpr", "expression": self._parse_unary()}
 
