@@ -29,43 +29,19 @@ export NOVA_NET_DRIVER=py
 nova serve demo/llvm_serve_profile.nv --cap net
 ```
 
-## Agent Context (TOON) generado por `nova agt init`
-
-`nova agt init --root .` ahora genera `agent.toon` con keys cortas IA-first
-como formato por defecto. Se mantiene compatibilidad con flujos legacy via `leg`
-y con `nova agt sync/chk/pack`.
-
-Keys cortas principales:
-
-- `v`: version del contrato de agente (`0.1.2`)
-- `k`: tipo de documento (`agt`)
-- `gen`: metadatos del generador (`by`, `at`, `os`, `py`)
-- `rt`: root relativo
-- `pn`: nombre de proyecto
-- `ig`: globs ignorados recomendados
-- `ns`: namespaces reservados (`ctx`, `db`)
-- `cxa`: aliases de contexto (`q`, `p`, `h`, `b`)
-- `cap`: capacidades experimentales documentadas (`net`, `html`)
-- `fs`: resumen de filesystem (`ent`, `upd`)
-- `fls`: lista corta de archivos importantes
-- `tsk`: tareas iniciales sugeridas (`sync`, `chk`, `pack`)
-- `leg`: bloque de compatibilidad legacy
-
-Ejemplo minimo:
-
-```toon
-@toon v1
-@type table
-|key|value|origin|
-|"v"|"0.1.2"|"manual"|
-|"k"|"agt"|"manual"|
-|"cxa"|"{\"b\":\"body\",\"h\":\"headers\",\"p\":\"params\",\"q\":\"query\"}"|"manual"|
-|"tsk"|"[\"sync\",\"chk\",\"pack\"]"|"manual"|
+```bash
+export NOVA_NET_DRIVER=node
+nova serve demo/llvm_serve_profile.nv --cap net
 ```
 
-## Demo
+PowerShell:
 
-Output IA-first con keys cortas.
+```powershell
+$env:NOVA_NET_DRIVER="node"
+nova serve demo/llvm_serve_profile.nv --cap net
+```
+
+Contrato de `http.get` (sin cambios):
 
 PowerShell:
 

@@ -5,7 +5,7 @@ Summary: NOVA v0.1 IA-first DSL tooling
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 
-﻿# NOVA v0.1.4
+# NOVA v0.1.5
 
 NOVA es un DSL IA-first para APIs y scripting con IR estable y backends pluggable.
 
@@ -79,10 +79,3 @@ curl http://127.0.0.1:3001/db
 python -m unittest discover -s tests -v
 cd compiler/llvm && cargo test
 ```
-
-## Limitaciones v0.1.4
-
-- Backend LLVM soporta subset de handlers (`let`, `cap call`, `rst.ok/err`, JSON literals).
-- `rte` soportado para flujo HTTP JSON (GET/otros metodos por matching basico).
-- No hay aun compilacion LLVM de AST a machine IR por funcion; se usa runtime embebido con IR interpreter.
-- v0.1.5 objetivo: ampliar subset (if/match), typed body JSON robusto y optimizer/codegen real.
