@@ -263,15 +263,15 @@ def cmd_agt_init(args: argparse.Namespace) -> int:
         sys.stdout.write(f"[NVA103] agt init: {exc}\n")
         return 2
 
-    dict_status = "written" if result.dictionary_written else "kept"
-    md_status = "written" if result.guide_written else "kept"
-    agent_status = "written" if result.agent_written else "kept"
+    dict_status = "written" if report.dictionary_written else "kept"
+    md_status = "written" if report.guide_written else "kept"
+    agent_status = "written" if report.agent_written else "kept"
     sys.stdout.write(
         "init ok "
-        f"agent={result.agent_path} ({agent_status}) "
-        f"dict={result.dictionary_path} ({dict_status}) "
-        f"md={result.guide_path} ({md_status}) "
-        f"agent_rows={result.agent_rows} dict_rows={result.dictionary_rows}\n"
+        f"agent={report.agent_path} ({agent_status}) "
+        f"dict={report.dictionary_path} ({dict_status}) "
+        f"md={report.guide_path} ({md_status}) "
+        f"agent_rows={report.agent_rows} dict_rows={report.dictionary_rows}\n"
     )
     return 0
 
