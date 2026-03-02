@@ -73,15 +73,16 @@ Incluye:
 Nota de sintaxis:
 
 - Los strings son `"..."` sin prefijo. `str"..."` fue removido.
-- Los metodos HTTP (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`) son keywords sin comillas.
+- Los metodos HTTP (`GET`, `POST`, `PUT`, `DEL`, `PAT`, `OPT`, `HED`) son keywords sin comillas.
 - `nova fmt` normaliza ambas convenciones automaticamente.
+- Alias estandar de contexto: `ctx.q` (query), `ctx.p` (params), `ctx.h` (headers), `ctx.b` (body).
 - Ejemplo:
 
 ```nova
 rte "/items" POST json {
   tb items
-  grd body, body.name : "BAD_REQUEST"
-  rst.ok(db.create(body))
+  grd ctx.b, ctx.b.name : "BAD_REQUEST"
+  rst.ok(db.create(ctx.b))
 }
 ```
 
@@ -126,6 +127,9 @@ nova agt pack --root . --output demo/agent.pack.toon
 
 ## Runtime Error Format (.toon)
 
+Errores de ruta en DSL usan `err { code, msg }` dentro de `rst`.
+El runtime tambien emite errores estructurados en TOON para fallos de parse/validacion:
+
 Cuando el runtime encuentra un `.nv` invalido, devuelve error estructurado en TOON:
 
 ```toon
@@ -159,7 +163,7 @@ El agente debe esperar y parsear este formato en el loop de iteracion.
 
 ### v0.1.2 — Refactor sintaxis IA-first
 - str"..." removido del spec. nova fmt lo normaliza automaticamente. El runtime lo acepta pero no es sintaxis valida nueva.
-- Metodos HTTP promovidos a keywords (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`)
+- Metodos HTTP promovidos a keywords (`GET`, `POST`, `PUT`, `DEL`, `PAT`, `OPT`, `HED`)
 - `rst<any, err>` declarado una vez en firma de modulo
 - `cap [db]` inferido automaticamente desde `tb`
 - `grd` reemplaza cascadas de validacion de nulos `BAD_REQUEST`
