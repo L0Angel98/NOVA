@@ -168,8 +168,13 @@ def cmd_agt_init(args: argparse.Namespace) -> int:
 
     dict_status = "written" if result.dictionary_written else "kept"
     md_status = "written" if result.guide_written else "kept"
+    agent_status = "written" if result.agent_written else "kept"
     sys.stdout.write(
-        f"init ok dict={result.dictionary_path} ({dict_status}) md={result.guide_path} ({md_status}) rows={result.dictionary_rows}\n"
+        "init ok "
+        f"agent={result.agent_path} ({agent_status}) "
+        f"dict={result.dictionary_path} ({dict_status}) "
+        f"md={result.guide_path} ({md_status}) "
+        f"agent_rows={result.agent_rows} dict_rows={result.dictionary_rows}\n"
     )
     return 0
 

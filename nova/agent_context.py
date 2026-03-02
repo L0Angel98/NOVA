@@ -4,8 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import platform
 from pathlib import Path
 import re
+import sys
 from typing import Any, Dict, Iterable, List, Tuple
 
 from .parser import parse_nova
@@ -48,10 +50,13 @@ class AgentCheckReport:
 
 @dataclass(frozen=True)
 class AgentInitReport:
+    agent_path: Path
     dictionary_path: Path
     guide_path: Path
+    agent_written: bool
     dictionary_written: bool
     guide_written: bool
+    agent_rows: int
     dictionary_rows: int
 
 
@@ -78,18 +83,28 @@ def init_agent_knowledge(
     *,
     force: bool = False,
 ) -> AgentInitReport:
+    agent_path = default_agent_path(root)
+    agent_rows = _default_agent_rows(root)
+    agent_text = encode_toon(
+        [{"key": row.key, "value": row.value, "origin": row.origin} for row in agent_rows]
+    )
+
     rows = _default_dictionary_rows()
     dictionary_text = encode_toon(rows)
     guide_text = _default_language_guide_markdown(root.name or "project")
 
+    agent_written = _write_if_allowed(agent_path, agent_text, force=force)
     dictionary_written = _write_if_allowed(dictionary_path, dictionary_text, force=force)
     guide_written = _write_if_allowed(guide_path, guide_text, force=force)
 
     return AgentInitReport(
+        agent_path=agent_path,
         dictionary_path=dictionary_path,
         guide_path=guide_path,
+        agent_written=agent_written,
         dictionary_written=dictionary_written,
         guide_written=guide_written,
+        agent_rows=len(agent_rows),
         dictionary_rows=len(rows),
     )
 
@@ -365,6 +380,86 @@ def _to_stable_value(value: Any) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _default_agent_rows(root: Path) -> List[AgentRow]:
+    gen = {
+        "by": "nova",
+        "at": _utc_now_iso(),
+        "os": platform.system().lower(),
+        "py": ".".join(str(part) for part in sys.version_info[:3]),
+    }
+    ignores = [
+        ".git",
+        "node_modules",
+        "dist",
+        "build",
+        "__pycache__",
+        ".venv",
+        ".next",
+        "coverage",
+        ".pytest_cache",
+        ".mypy_cache",
+    ]
+    ns = {"ctx": "reserved", "db": "reserved"}
+    cxa = {"q": "query", "p": "params", "h": "headers", "b": "body"}
+    cap = {"net": "http.get", "html": ["tte", "sct"]}
+    fs = {"ent": len(list(_iter_project_files(root))), "upd": _utc_now_iso()}
+    fls = _important_files(root, max_items=30)
+    tsk = ["sync", "chk", "pack"]
+    legacy = {"routes": [], "tests": [], "synced_at_utc": ""}
+
+    manual_rows = [
+        AgentRow(key="v", value="0.1.2", origin="manual"),
+        AgentRow(key="k", value="agt", origin="manual"),
+        AgentRow(key="gen", value=_to_stable_value(gen), origin="manual"),
+        AgentRow(key="rt", value=".", origin="manual"),
+        AgentRow(key="pn", value=root.name or root.as_posix(), origin="manual"),
+        AgentRow(key="ig", value=_to_stable_value(ignores), origin="manual"),
+        AgentRow(key="ns", value=_to_stable_value(ns), origin="manual"),
+        AgentRow(key="cxa", value=_to_stable_value(cxa), origin="manual"),
+        AgentRow(key="cap", value=_to_stable_value(cap), origin="manual"),
+        AgentRow(key="fs", value=_to_stable_value(fs), origin="manual"),
+        AgentRow(key="fls", value=_to_stable_value(fls), origin="manual"),
+        AgentRow(key="tsk", value=_to_stable_value(tsk), origin="manual"),
+        AgentRow(key="leg", value=_to_stable_value(legacy), origin="manual"),
+    ]
+    return _canonicalize_rows(manual_rows)
+
+
+def _important_files(root: Path, *, max_items: int) -> List[str]:
+    selected: List[str] = []
+    seen: set[str] = set()
+
+    def add_path(path: Path) -> None:
+        rel = path.relative_to(root).as_posix()
+        if rel in seen:
+            return
+        seen.add(rel)
+        selected.append(rel)
+
+    for relative in [Path("README.md"), Path("SPEC.md"), Path("pyproject.toml")]:
+        path = root / relative
+        if path.exists() and path.is_file():
+            add_path(path)
+
+    demo_dir = root / "demo"
+    if demo_dir.exists():
+        for path in sorted(demo_dir.glob("*.nv")):
+            if path.is_file():
+                add_path(path)
+
+    nova_dir = root / "nova"
+    if nova_dir.exists():
+        for path in sorted(nova_dir.rglob("*")):
+            if path.is_file():
+                add_path(path)
+
+    return selected[:max_items]
 
 
 def _write_if_allowed(path: Path, text: str, *, force: bool) -> bool:
