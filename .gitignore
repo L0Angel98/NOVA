@@ -1,0 +1,4 @@
+.nova/
+out/
+compiler/llvm/target/
+

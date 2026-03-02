@@ -1,0 +1,11 @@
+mdl scrape_profile v"0.1.3" rst<any, err> {
+  rte "/profile" GET json {
+    cap [net, html]
+    let pg = cap http.get("https://example.com")
+    let ti = cap html.tte(pg)
+    let h1 = cap html.sct(pg, "h1")
+    let p = cap html.sct(pg, "p")
+    rst.ok({st: pg.st, ti: ti, h1: h1, p: p})
+  }
+}
+

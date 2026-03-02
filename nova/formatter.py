@@ -234,6 +234,10 @@ class Formatter:
             text = f"awt {self._format_expr(expr['expression'], 7)}"
             return f"({text})" if 7 < parent_precedence else text
 
+        if typ == "CapExpr":
+            text = f"cap {self._format_expr(expr['expression'], 7)}"
+            return f"({text})" if 7 < parent_precedence else text
+
         if typ == "AsyncExpr":
             if not expr.get("body"):
                 return "asy {}"
