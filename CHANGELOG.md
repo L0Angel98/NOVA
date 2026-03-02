@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- migrate `.nova/idx.toon` to TOON standard columnar blocks (`@type std`) with NOVA extensions via `#nova_*`.
+- migrate `agent.dictionary.toon` to TOON standard columnar blocks (`@type std`) and keep NOVA metadata blocks.
+- extend TOON parser/decoder to accept standard block format with indentation-based nested objects.
+- add `parse_toon` entry point in `nova/parser.py` for TOON standard payload parsing.
+
 ## v0.1.6 (2026-03-02)
 
 - add browser net driver using Playwright (`NOVA_NET_DRIVER=browser`).

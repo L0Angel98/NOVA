@@ -22,3 +22,4 @@ include = ["nova", "nova.*"]
 
 [tool.setuptools.package-data]
 "nova.cap.net" = ["*.mjs"]
+"nova" = ["data/nova_skill.md"]

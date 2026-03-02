@@ -1,4 +1,27 @@
 @toon v1
-@type table
-@rows 0
-|_|
+@type std
+dict:
+  |i|term|category|meaning|example|
+  |0|"mdl"|"keyword"|"Declaracion de modulo"|"mdl demo v\"0.1.0\" rst<any, err> { ... }"|
+  |1|"rte"|"keyword"|"Declaracion de ruta HTTP"|"rte \"/items\" GET json { ... }"|
+  |2|"GET|POST|PUT|PATCH|DELETE"|"keyword"|"Metodos HTTP canonicos"|"rte \"/items\" POST json { ... }"|
+  |3|"let"|"keyword"|"Binding inmutable"|"let name = \"nova\""|
+  |4|"if/els"|"keyword"|"Control de flujo condicional"|"if x == nul { ... } els { ... }"|
+  |5|"match"|"keyword"|"Pattern matching"|"match state { \"ok\" => 1 _ => 0 }"|
+  |6|"grd"|"keyword"|"Validacion de presencia con error estandar"|"grd body, body.name : \"BAD_REQUEST\""|
+  |7|"tb/whe/lim/ord"|"keyword"|"DB IR declarativo"|"tb users.q { whe active == tru ord id desc lim num10 }"|
+  |8|"cap"|"keyword"|"Declaracion de capabilities estaticas"|"cap [db, env]"|
+  |9|"rst.ok / err"|"result"|"Contrato de salida para rutas"|"rst.ok({ok: tru}) / err {code: \"BAD_REQUEST\", msg: \"...\"}"|
+  |10|"json / toon"|"format"|"Formatos de respuesta"|"rte \"/items\" GET toon { ... }"|
+  |11|"str literal"|"literal"|"String se expresa como \"...\" (sin prefijo str)"|"let title = \"hello\""|
+  |12|"num literal"|"literal"|"Numero con prefijo num"|"lim num50"|
+  |13|"tru/fal/nul"|"literal"|"Booleanos y nulo canonicos"|"if body == nul { ... }"|
+  |14|"module_default_result"|"nomenclature"|"Tipo rst por defecto en firma de modulo"|"mdl demo v\"0.1.0\" rst<any, err> { ... }"|
+  |15|"runtime_error_toon"|"nomenclature"|"Errores de parse/runtime en formato TOON estructurado"|"@toon v1 + @type error + |k|v|"|
+#nova_meta:
+  |k|v|
+  |"v"|"0.1.6"|
+  |"fmt"|"std"|
+#nova_optional:
+  |k|v|
+  |"example"|"may be empty for some terms"|

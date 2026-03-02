@@ -5,6 +5,7 @@ import time
 import unittest
 import urllib.request
 
+from nova.parser import parse_toon
 from nova.runtime import NovaRuntime, run_server
 from nova.toon import ToonDecodeError, decode_toon, encode_toon, json_size_bytes, toon_size_bytes
 
@@ -48,6 +49,44 @@ class NovaToonTests(unittest.TestCase):
         ]
 
         self.assertLess(toon_size_bytes(rows), json_size_bytes(rows))
+
+    def test_toon_std_nested_blocks_and_nova_extensions(self) -> None:
+        text = """@toon v1
+@type std
+root:
+  |k|v|
+  |v|0.1.6|
+  |rt|.|
+sum:
+  |i|v|
+  |0|project=nova|
+  |1|routes=1|
+cap:
+  |i|v|
+  |0|net|
+  |1|html|
+#nova_nd:
+  |k|v|
+  |sel|env:NOVA_NET_DRIVER|
+  |nt|browser=headless,install_chromium,js|
+"""
+        value = decode_toon(text)
+        self.assertEqual(value["v"], "0.1.6")
+        self.assertEqual(value["rt"], ".")
+        self.assertEqual(value["sum"], ["project=nova", "routes=1"])
+        self.assertEqual(value["cap"], ["net", "html"])
+        self.assertEqual(value["nd"]["sel"], "env:NOVA_NET_DRIVER")
+        self.assertEqual(value["nd"]["nt"], "browser=headless,install_chromium,js")
+
+    def test_parse_toon_uses_toon_decoder(self) -> None:
+        payload = """@toon v1
+@type std
+root:
+  |k|v|
+  |v|0.1.6|
+"""
+        parsed = parse_toon(payload)
+        self.assertEqual(parsed["v"], "0.1.6")
 
     def test_http_text_toon_request_and_response(self) -> None:
         server = run_server(DEMO_APP, host="127.0.0.1", port=0, capabilities={"db"})

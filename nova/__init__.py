@@ -3,7 +3,7 @@
 from .checker import check_ast
 from .db_ir import DbIr, DbPlan, InMemoryDbIrAdapter, build_ir_from_table_stmt, compile_plan
 from .formatter import format_nova
-from .parser import parse_nova
+from .parser import parse_nova, parse_toon
 from .runtime import NovaRuntime, run_server
 from .toon import decode_toon, encode_toon
 from .agent_context import check_agent, pack_agent, sync_agent
@@ -15,6 +15,7 @@ __all__ = [
     "VERSION",
     "__version__",
     "parse_nova",
+    "parse_toon",
     "format_nova",
     "check_ast",
     "sync_agent",

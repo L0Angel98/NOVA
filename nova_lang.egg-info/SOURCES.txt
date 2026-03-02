@@ -29,6 +29,8 @@ nova/cap/net/node.py
 nova/cap/net/node_fetch.mjs
 nova/cap/net/node_worker.mjs
 nova/cap/net/py.py
+nova/data/__init__.py
+nova/data/nova_skill.md
 nova/ir/__init__.py
 nova/ir/emit.py
 nova/ir/nodes.py
