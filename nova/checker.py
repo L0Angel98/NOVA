@@ -397,6 +397,8 @@ class Checker:
             if owner.kind == "meta:rst" and expr["property"] in {"ok", "err"}:
                 return TYPE_UNKNOWN
             return TYPE_UNKNOWN
+        if typ == "CapExpr":
+            return self._check_cap_expr(expr, env, path, allow_unresolved_ident)
         if typ == "CallExpr":
             return self._check_call_expr(expr, env, path, allow_unresolved_ident)
         if typ == "UnaryExpr":
@@ -482,6 +484,68 @@ class Checker:
                     f"Argument type {type_to_string(arg_type)} is not assignable to parameter {type_to_string(param_types[idx])}",
                 )
         return return_type
+
+    def _check_cap_expr(self, expr: Dict[str, Any], env: Env, path: str, allow_unresolved_ident: bool) -> NovaType:
+        inner = expr.get("expression")
+        if not isinstance(inner, dict):
+            self._error("NVC331", path, "cap expects namespace operation call (e.g., cap http.get(...))")
+            return TYPE_UNKNOWN
+
+        if inner.get("type") != "CallExpr":
+            self._error("NVC331", path, "cap expects call expression (e.g., cap http.get(...))")
+            self._check_expr(inner, env, f"{path}.expression", allow_unresolved_ident)
+            return TYPE_UNKNOWN
+
+        callee = inner.get("callee", {})
+        if (
+            callee.get("type") != "MemberExpr"
+            or callee.get("object", {}).get("type") != "Identifier"
+        ):
+            self._error("NVC331", path, "cap expects namespace operation call (ns.op(...))")
+            for idx, arg in enumerate(inner.get("args", [])):
+                self._check_expr(arg, env, f"{path}.expression.args[{idx}]", allow_unresolved_ident)
+            return TYPE_UNKNOWN
+
+        owner = callee["object"]["name"]
+        op = callee["property"]
+        args = inner.get("args", [])
+
+        if owner == "http" and op == "get":
+            if len(args) < 1 or len(args) > 3:
+                self._error("NVC332", path, "cap http.get expects 1 to 3 args (url, h?, t?)")
+            if len(args) >= 1:
+                url_type = self._check_expr(args[0], env, f"{path}.expression.args[0]", allow_unresolved_ident)
+                self._expect_assignable(url_type, TYPE_STR, "NVC333", f"{path}.expression.args[0]", "http.get url must be str")
+            if len(args) >= 2:
+                self._check_expr(args[1], env, f"{path}.expression.args[1]", allow_unresolved_ident)
+            if len(args) >= 3:
+                timeout_type = self._check_expr(args[2], env, f"{path}.expression.args[2]", allow_unresolved_ident)
+                self._expect_assignable(timeout_type, TYPE_NUM, "NVC334", f"{path}.expression.args[2]", "http.get t must be num")
+            return TYPE_STR
+
+        if owner == "html" and op == "tte":
+            if len(args) != 1:
+                self._error("NVC332", path, "cap html.tte expects exactly 1 arg (html)")
+            if len(args) >= 1:
+                html_type = self._check_expr(args[0], env, f"{path}.expression.args[0]", allow_unresolved_ident)
+                self._expect_assignable(html_type, TYPE_STR, "NVC333", f"{path}.expression.args[0]", "html.tte html must be str")
+            return TYPE_STR
+
+        if owner == "html" and op == "sct":
+            if len(args) != 2:
+                self._error("NVC332", path, "cap html.sct expects exactly 2 args (html, css)")
+            if len(args) >= 1:
+                html_type = self._check_expr(args[0], env, f"{path}.expression.args[0]", allow_unresolved_ident)
+                self._expect_assignable(html_type, TYPE_STR, "NVC333", f"{path}.expression.args[0]", "html.sct html must be str")
+            if len(args) >= 2:
+                css_type = self._check_expr(args[1], env, f"{path}.expression.args[1]", allow_unresolved_ident)
+                self._expect_assignable(css_type, TYPE_STR, "NVC333", f"{path}.expression.args[1]", "html.sct css must be str")
+            return t_array(TYPE_STR)
+
+        self._error("NVC335", path, f"unsupported cap operation '{owner}.{op}'")
+        for idx, arg in enumerate(args):
+            self._check_expr(arg, env, f"{path}.expression.args[{idx}]", allow_unresolved_ident)
+        return TYPE_UNKNOWN
 
     def _check_binary_expr(self, expr: Dict[str, Any], env: Env, path: str, allow_unresolved_ident: bool) -> NovaType:
         left = self._check_expr(expr["left"], env, f"{path}.left", allow_unresolved_ident)
