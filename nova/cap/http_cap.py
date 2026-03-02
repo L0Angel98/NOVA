@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import Any, Dict
 
-import requests
+from .net import node as node_driver
+from .net import py as py_driver
+from .net.base import NetDriverError, ensure_http_payload
 
 
 @dataclass(frozen=True)
@@ -29,21 +32,35 @@ def http_get(url: Any, h: Any = None, t: Any = None) -> Dict[str, Any]:
         if timeout <= 0:
             raise HttpCapError("NET_INPUT", "timeout must be > 0")
 
-    headers: Dict[str, str] = {"User-Agent": "nova/0.1.3"}
+    headers: Dict[str, str] = {"User-Agent": "nova/0.1.5"}
     if h is not None:
         if not isinstance(h, dict):
             raise HttpCapError("NET_INPUT", "headers must be object")
         for key, value in h.items():
             headers[str(key)] = str(value)
 
-    try:
-        response = requests.get(target, headers=headers, timeout=timeout)
-    except requests.RequestException as exc:
-        raise HttpCapError("NET_REQ", str(exc)) from exc
+    driver_name = _resolve_driver_name()
+    driver = _resolve_driver(driver_name)
 
-    return {
-        "st": int(response.status_code),
-        "hd": dict(response.headers.items()),
-        "bd": response.text,
-    }
+    try:
+        payload = driver(target, headers, timeout)
+        return ensure_http_payload(payload, driver=driver_name)
+    except NetDriverError as exc:
+        raise HttpCapError(exc.code, exc.msg) from exc
+
+
+def _resolve_driver_name() -> str:
+    raw = os.environ.get("NOVA_NET_DRIVER", "py")
+    name = str(raw).strip().lower()
+    if name == "":
+        return "py"
+    return name
+
+
+def _resolve_driver(name: str):
+    if name == "py":
+        return py_driver.http_get
+    if name == "node":
+        return node_driver.http_get
+    raise HttpCapError("NET_INPUT", f"unsupported net driver '{name}' (expected py|node)")
 

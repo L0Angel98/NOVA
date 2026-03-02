@@ -1,4 +1,4 @@
-"""Runtime capabilities for NOVA v0.1.3."""
+"""Runtime capabilities for NOVA v0.1.5."""
 
 from .db_sqlite import DbSqliteCap, DbSqliteError
 from .html_cap import html_sct, html_tte
