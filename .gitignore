@@ -2,3 +2,21 @@
 out/
 compiler/llvm/target/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Build outputs
+out/
+build/
+dist/
+compiler/llvm/target/
+
+# Native binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.o
+*.obj
