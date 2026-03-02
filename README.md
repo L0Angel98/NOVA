@@ -9,6 +9,45 @@ pip install -e .
 nova --version
 ```
 
+## Versioned Capabilities
+
+### v0.1.2
+
+- focus: language baseline + ctx aliases.
+- backends: interp.
+- caps: net (basic), html (exp).
+- notes: HTTP methods as keywords and static cap model.
+
+### v0.1.3
+
+- focus: stable IR + pluggable backend architecture.
+- backends: interp, llvm (subset), go (stub).
+- caps: net, html, db (sqlite).
+- notes: `.nova/idx.toon` agent context index introduced.
+
+### v0.1.4
+
+- focus: native LLVM serve for runtime subset.
+- backends: interp, llvm (native serve), go (stub).
+- caps: net, html, db (native in llvm runtime).
+- notes: llvm serve runs without Python runtime in execution path.
+
+### v0.1.5
+
+- focus: net driver selection via environment.
+- backends: interp, llvm.
+- caps: net(py), net(node).
+- notes: explicit `http.get` status/error propagation; keepalive tuned in v0.1.5.1.
+
+### v0.1.6
+
+- focus: browser networking for JS-rendered sources.
+- backends: interp, llvm.
+- caps: net(py), net(node), net(browser).
+- notes: Playwright Chromium headless driver (`NOVA_NET_DRIVER=browser`).
+
+Agent context generated via `nova agt init` includes capability hints aligned with the current runtime version.
+
 ## v0.1.6
 
 ### Backends
