@@ -1,0 +1,28 @@
+﻿@toon v1
+@type table
+@rows 24
+|k|v|
+|"sys.agent.version"|"agent.v0.1"|
+|"sys.project.name"|"nova"|
+|"sys.snapshot.digest"|"c8f1d3a9e4b67210ac9d5f3e"|
+|"sys.snapshot.file_count"|"27"|
+|"sys.snapshot.route_count"|"7"|
+|"sys.snapshot.test_count"|"24"|
+|"sys.cap.model"|"static-default-deny"|
+|"async_core"|"asy,awt"|
+|"canonical_formats"|"json,toon"|
+|"capability_core"|"cap"|
+|"db_core"|"tb,whe,lim,ord"|
+|"error_core"|"rst,err"|
+|"language_goal"|"DSL APIs + scripting IA-first v2"|
+|"open_question_1"|"Gramatica formal de operadores pendiente"|
+|"open_question_2"|"Semantica exacta de rst.ok pendiente"|
+|"open_question_3"|"Concurrencia/cancelacion de asy pendiente"|
+|"project_name"|"NOVA"|
+|"route_core"|"rte"|
+|"spec_version"|"0.2"|
+|"team_convention"|"Usar keywords canonicas sin sinonimos"|
+|"syntax_version"|"v2-ia-first"|
+|"removed_noise"|"str_prefix,rst_default,cap_infer,grd"|
+|"error_format"|"toon-structured"|
+|"runtime_error_fields"|"line,token,expected,file,severity"|

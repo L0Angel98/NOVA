@@ -1,0 +1,41 @@
+﻿mdl demo v"0.1.0" rst<any, err> {
+  rte "/ping" GET json {
+    rst.ok({method: ctx.method, request_id: ctx.request_id, service: "nova-demo", version: "0.1.0"})
+  }
+  rte "/items" GET json {
+    tb items
+    if query.n == nul {
+      lim num50
+    }
+    els {
+      lim to_num(query.n)
+    }
+    ord id asc
+    rst.ok({ctx: ctx, headers: headers, items: db.read(), query: query})
+  }
+  rte "/items" POST json {
+    tb items
+    grd body, body.name : "BAD_REQUEST"
+    rst.ok(db.create(body))
+  }
+  rte "/items/:id" PUT json {
+    tb items
+    whe id == params.id
+    rst.ok(db.update(body))
+  }
+  rte "/items/:id" DELETE json {
+    tb items
+    whe id == params.id
+    rst.ok(db.delete())
+  }
+  rte "/items.toon" GET toon {
+    tb items
+    ord id asc
+    rst.ok(db.read())
+  }
+  rte "/items.toon" POST toon {
+    tb items
+    grd body, body.name : "BAD_REQUEST"
+    rst.ok(db.create(body))
+  }
+}

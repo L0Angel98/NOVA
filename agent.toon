@@ -1,0 +1,29 @@
+﻿@toon v1
+@type table
+@rows 24
+|key|value|origin|
+|"async_core"|"asy,awt"|"manual"|
+|"canonical_formats"|"json,toon"|"manual"|
+|"capability_core"|"cap"|"manual"|
+|"db_core"|"tb,whe,lim,ord"|"manual"|
+|"error_core"|"rst,err"|"manual"|
+|"language_goal"|"DSL APIs + scripting IA-first"|"manual"|
+|"open_question_1"|"Gramatica formal de operadores pendiente"|"manual"|
+|"open_question_2"|"Semantica exacta de rst.ok pendiente"|"manual"|
+|"open_question_3"|"Concurrencia/cancelacion de asy pendiente"|"manual"|
+|"project_name"|"NOVA"|"manual"|
+|"route_core"|"rte"|"manual"|
+|"spec_version"|"0.1"|"manual"|
+|"sys.agent.version"|"agent.v0.1"|"auto"|
+|"sys.cap.model"|"static-default-deny"|"auto"|
+|"sys.commands"|"parse,fmt,check,serve,agt pack,agt sync,agt chk"|"auto"|
+|"sys.project.name"|"nova"|"auto"|
+|"sys.snapshot.digest"|"90405a0eebf1ec5663de2650"|"auto"|
+|"sys.snapshot.file_count"|"27"|"auto"|
+|"sys.snapshot.nv_file_count"|"1"|"auto"|
+|"sys.snapshot.parse_error_count"|"0"|"auto"|
+|"sys.snapshot.route_count"|"7"|"auto"|
+|"sys.snapshot.synced_at_utc"|"2026-03-01T23:39:34Z"|"auto"|
+|"sys.snapshot.test_count"|"24"|"auto"|
+|"team_convention"|"Usar keywords canonicas sin sinonimos"|"manual"|
+

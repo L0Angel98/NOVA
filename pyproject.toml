@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nova-lang"
+version = "0.1.0"
+description = "NOVA v0.1 IA-first DSL tooling"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.scripts]
+nova = "nova.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["nova", "nova.*"]
