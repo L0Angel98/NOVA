@@ -217,6 +217,10 @@ class Formatter:
             text = f"{self._format_expr(expr['object'], 8)}.{expr['property']}"
             return f"({text})" if 8 < parent_precedence else text
 
+        if typ == "CapExpr":
+            text = f"cap {self._format_expr(expr['expression'], 7)}"
+            return f"({text})" if 7 < parent_precedence else text
+
         if typ == "CallExpr":
             args = ", ".join(self._format_expr(arg) for arg in expr.get("args", []))
             text = f"{self._format_expr(expr['callee'], 8)}({args})"

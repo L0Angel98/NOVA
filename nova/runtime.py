@@ -6,11 +6,14 @@ import json
 import os
 from pathlib import Path
 import re
+import requests
 import time
 import traceback
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 from urllib import request as urllib_request
+
+from bs4 import BeautifulSoup
 
 from .db_ir import (
     DbIr,
@@ -779,6 +782,8 @@ class NovaRuntime:
             if hasattr(obj, prop):
                 return getattr(obj, prop)
             return None
+        if typ == "CapExpr":
+            return self._eval_cap_expr(expr["expression"], scope, query)
         if typ == "CallExpr":
             callee = self._eval_expr(expr["callee"], scope, query)
             args = [self._eval_expr(arg, scope, query) for arg in expr.get("args", [])]
@@ -806,6 +811,106 @@ class NovaRuntime:
             return _AsyncThunk(lambda: self._exec_block(body, Scope(captured), QueryState()))
 
         raise RuntimeExecError("BAD_REQUEST", f"unsupported expression type '{typ}'", status=400)
+
+    def _eval_cap_expr(self, expr: Dict[str, Any], scope: Scope, query: Optional[QueryState]) -> Any:
+        if expr.get("type") != "CallExpr":
+            raise RuntimeExecError(
+                "BAD_REQUEST",
+                "cap expects operation call (e.g., cap http.get(url))",
+                status=400,
+            )
+
+        callee = expr.get("callee", {})
+        if callee.get("type") != "MemberExpr" or callee.get("object", {}).get("type") != "Identifier":
+            raise RuntimeExecError(
+                "BAD_REQUEST",
+                "cap expects namespace operation call (ns.op(...))",
+                status=400,
+            )
+
+        namespace = callee["object"]["name"]
+        operation = callee["property"]
+        args = [self._eval_expr(arg, scope, query) for arg in expr.get("args", [])]
+
+        if namespace == "http" and operation == "get":
+            return self._cap_http_get(args)
+        if namespace == "html" and operation == "tte":
+            return self._cap_html_tte(args)
+        if namespace == "html" and operation == "sct":
+            return self._cap_html_sct(args)
+
+        raise RuntimeExecError(
+            "BAD_REQUEST",
+            f"unsupported cap operation '{namespace}.{operation}'",
+            status=400,
+        )
+
+    def _cap_http_get(self, args: List[Any]) -> str:
+        if len(args) < 1 or len(args) > 3:
+            raise RuntimeExecError(
+                "BAD_REQUEST",
+                "cap http.get expects 1 to 3 args (url, h?, t?)",
+                status=400,
+            )
+
+        if "net" not in self.granted_caps:
+            raise RuntimeExecError(
+                "CAP_FORBIDDEN",
+                "[NVR200] cap: net required for http.get",
+                status=403,
+                details={"required_cap": "net", "operation": "http.get"},
+            )
+
+        url = args[0]
+        if not isinstance(url, str) or url.strip() == "":
+            raise RuntimeExecError("BAD_REQUEST", "http.get url must be non-empty str", status=400)
+
+        headers: Dict[str, str] = {}
+        if len(args) >= 2 and args[1] is not None:
+            raw_headers = args[1]
+            if not isinstance(raw_headers, dict):
+                raise RuntimeExecError("BAD_REQUEST", "http.get h must be object when provided", status=400)
+            headers = {str(k): str(v) for k, v in raw_headers.items()}
+
+        timeout_ms = 5000.0
+        if len(args) >= 3 and args[2] is not None:
+            try:
+                timeout_ms = float(args[2])
+            except Exception as exc:
+                raise RuntimeExecError("BAD_REQUEST", "http.get t must be numeric milliseconds", status=400) from exc
+        if timeout_ms <= 0:
+            raise RuntimeExecError("BAD_REQUEST", "http.get t must be > 0", status=400)
+
+        try:
+            res = requests.get(url, headers=headers, timeout=timeout_ms / 1000.0)
+            return res.text
+        except requests.RequestException as exc:
+            raise RuntimeExecError("BAD_REQUEST", f"http.get failed: {exc}", status=400) from exc
+
+    def _cap_html_tte(self, args: List[Any]) -> str:
+        if len(args) != 1:
+            raise RuntimeExecError("BAD_REQUEST", "cap html.tte expects exactly 1 arg (html)", status=400)
+        html = args[0]
+        if not isinstance(html, str):
+            raise RuntimeExecError("BAD_REQUEST", "html.tte html must be str", status=400)
+
+        soup = BeautifulSoup(html, "html.parser")
+        if soup.title is None or soup.title.string is None:
+            return ""
+        return soup.title.string.strip()
+
+    def _cap_html_sct(self, args: List[Any]) -> List[str]:
+        if len(args) != 2:
+            raise RuntimeExecError("BAD_REQUEST", "cap html.sct expects exactly 2 args (html, css)", status=400)
+        html = args[0]
+        css = args[1]
+        if not isinstance(html, str):
+            raise RuntimeExecError("BAD_REQUEST", "html.sct html must be str", status=400)
+        if not isinstance(css, str):
+            raise RuntimeExecError("BAD_REQUEST", "html.sct css must be str", status=400)
+
+        soup = BeautifulSoup(html, "html.parser")
+        return [node.get_text(strip=True) for node in soup.select(css)]
 
     def _eval_binary(self, expr: Dict[str, Any], scope: Scope, query: Optional[QueryState]) -> Any:
         op = expr["operator"]
