@@ -11,7 +11,7 @@
       lim to_num(ctx.q.n)
     }
     ord id asc
-    rst.ok({ctx: ctx, headers: ctx.h, items: db.read(), query: ctx.q})
+    rst.ok({ctx: ctx, h: ctx.h, items: db.read(), q: ctx.q})
   }
   rte "/items" POST json {
     tb items
