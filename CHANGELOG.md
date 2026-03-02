@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.6 (2026-03-02)
+
+- add browser net driver using Playwright (`NOVA_NET_DRIVER=browser`).
+- browser driver usa Chromium headless con keepalive (reusa 1 browser por proceso).
+- keepalive se cierra limpio en `atexit` y mantiene contrato `{st, hd, bd}`.
+- selector de drivers actualizado: `py|node|browser` (default `py`).
+- docs y metricas actualizadas para install de Chromium y comparativa de drivers.
+
 ## v0.1.5.1 (2026-03-02)
 
 - node net driver now keepalive; reduced overhead.

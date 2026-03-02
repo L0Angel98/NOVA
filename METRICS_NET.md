@@ -1,75 +1,92 @@
-﻿# Net Driver Metrics (v0.1.5.1)
+﻿# Net Driver Metrics (v0.1.6)
 
 Fecha: 2026-03-02  
-Entorno: Windows, Python 3.10, Node v22.13.1
+Entorno: Windows, Python 3.10, Node v22.13.1, Playwright 1.58.0 (Chromium)
 
-## Keepalive benchmark (node)
-
-Objetivo: comparar `node` keepalive (worker persistente) contra baseline de `spawn por request` (simulado reiniciando worker en cada llamada).
-
-Endpoint: `https://example.com/`  
-Requests: 10
-
-Resultados medidos:
-
-- keepalive total: `694.78 ms`
-- keepalive starts: `1`
-- respawn baseline total: `2852.12 ms`
-- respawn starts total: `10`
-- mejora estimada: `75.64%`
-
-Benchmark reproducible:
+## Benchmark reproducible
 
 ```bash
 python - <<'PY'
 import os
+import statistics
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
 from nova.cap.http_cap import http_get
+from nova.cap.net import browser as browser_driver
 from nova.cap.net import node as node_driver
 
-URL = "https://example.com/"
-N = 10
-os.environ["NOVA_NET_DRIVER"] = "node"
+class JsHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = b"""<html><head><title>JS Fixture</title></head><body><div id='app'></div><script>document.getElementById('app').textContent=[74,83,95,79,75].map((c)=>String.fromCharCode(c)).join('');</script></body></html>"""
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, format, *args):
+        return
 
-node_driver._reset_worker_for_tests()
-t0 = time.perf_counter()
-for _ in range(N):
-    http_get(URL, None, 10)
-keep_ms = (time.perf_counter() - t0) * 1000.0
-keep_state = node_driver._debug_worker_state()
+def run_case(url, n=6):
+    rows = []
+    for drv in ['py', 'node', 'browser']:
+        os.environ['NOVA_NET_DRIVER'] = drv
+        if drv == 'node':
+            node_driver._reset_worker_for_tests()
+        if drv == 'browser':
+            browser_driver._reset_browser_for_tests()
+        times, statuses, js_ok = [], [], 0
+        for _ in range(n):
+            t0 = time.perf_counter()
+            out = http_get(url, None, 12)
+            times.append((time.perf_counter() - t0) * 1000.0)
+            statuses.append(int(out['st']))
+            if 'JS_OK' in str(out['bd']):
+                js_ok += 1
+        rows.append((drv, round(statistics.mean(times), 2), max(set(statuses), key=statuses.count), f"{js_ok}/{n}"))
+    return rows
 
-respawn_ms = 0.0
-respawn_starts = 0
-for _ in range(N):
-    node_driver._reset_worker_for_tests()
-    t1 = time.perf_counter()
-    http_get(URL, None, 10)
-    respawn_ms += (time.perf_counter() - t1) * 1000.0
-    respawn_starts += node_driver._debug_worker_state()["starts"]
+server = ThreadingHTTPServer(('127.0.0.1', 0), JsHandler)
+thr = threading.Thread(target=server.serve_forever, daemon=True)
+thr.start()
+js_url = f"http://127.0.0.1:{server.server_address[1]}/js"
 
-node_driver._reset_worker_for_tests()
-print("keepalive_ms", round(keep_ms, 2))
-print("keepalive_starts", keep_state["starts"])
-print("respawn_ms", round(respawn_ms, 2))
-print("respawn_starts_total", respawn_starts)
+print('profile', run_case('https://angelvlqz.onrender.com/'))
+print('js_fixture', run_case(js_url))
+
+os.environ['NOVA_NET_DRIVER'] = 'browser'
+browser_driver._reset_browser_for_tests()
+t0 = time.perf_counter(); http_get('https://angelvlqz.onrender.com/', None, 12); cold = (time.perf_counter() - t0) * 1000.0
+warm = []
+for _ in range(5):
+    t1 = time.perf_counter(); http_get('https://angelvlqz.onrender.com/', None, 12); warm.append((time.perf_counter() - t1) * 1000.0)
+print('browser_cold_ms', round(cold, 2))
+print('browser_warm_avg_ms', round(statistics.mean(warm), 2))
+print('browser_starts', browser_driver._debug_browser_state()['starts'])
+
+browser_driver._reset_browser_for_tests()
+server.shutdown(); server.server_close(); thr.join(timeout=2)
 PY
 ```
 
-## Driver comparison (py vs node keepalive)
+## Resultados
 
-Repeticiones por caso: 6
+Repeticiones por caso: `n=6`
 
-| case | endpoint | driver | avg ms | status |
-|---|---|---|---:|---:|
-| profile | `https://angelvlqz.onrender.com/` | py | 232.10 | 200 |
-| profile | `https://angelvlqz.onrender.com/` | node (keepalive) | 136.11 | 200 |
-| occ_blocked | `https://www.g2.com/` | py | 177.18 | 403 |
-| occ_blocked | `https://www.g2.com/` | node (keepalive) | 474.49 | 403 |
+| case | endpoint | py avg ms / st | node avg ms / st | browser avg ms / st | js_render (browser) |
+|---|---|---:|---:|---:|---|
+| profile | `https://angelvlqz.onrender.com/` | 226.63 / 200 | 117.97 / 200 | 534.02 / 200 | n/a |
+| js_fixture | local (`/js`) | 1.64 / 200 | 19.14 / 200 | 154.33 / 200 | 6/6 |
 
-Caso OCC: blocked by site anti-bot (expected behavior).
+Browser cold/warm (profile):
+
+- cold first request: `1078.54 ms`
+- warm avg next 5: `358.13 ms`
+- browser starts: `1` (keepalive)
 
 ## Notas
 
-- `http.get` mantiene contrato estable: `{st, hd, bd}`.
-- Status no-200 se propagan sin respuestas vacias silenciosas.
-- `node` ahora usa worker keepalive (JSONL), evitando spawn por request.
+- Contrato uniforme en todos los drivers: `{st, hd, bd}`.
+- `browser` esta pensado para casos con render JS permitido (sin bypass anti-bot).
+- Si Chromium no esta instalado: `python -m playwright install chromium`.

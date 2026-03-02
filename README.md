@@ -1,4 +1,4 @@
-# NOVA v0.1.5.1
+﻿# NOVA v0.1.6
 
 NOVA es un DSL IA-first para APIs y scripting con IR estable y backends pluggable.
 
@@ -9,7 +9,46 @@ pip install -e .
 nova --version
 ```
 
-## v0.1.5.1
+## Versioned Capabilities
+
+### v0.1.2
+
+- focus: language baseline + ctx aliases.
+- backends: interp.
+- caps: net (basic), html (exp).
+- notes: HTTP methods as keywords and static cap model.
+
+### v0.1.3
+
+- focus: stable IR + pluggable backend architecture.
+- backends: interp, llvm (subset), go (stub).
+- caps: net, html, db (sqlite).
+- notes: `.nova/idx.toon` agent context index introduced.
+
+### v0.1.4
+
+- focus: native LLVM serve for runtime subset.
+- backends: interp, llvm (native serve), go (stub).
+- caps: net, html, db (native in llvm runtime).
+- notes: llvm serve runs without Python runtime in execution path.
+
+### v0.1.5
+
+- focus: net driver selection via environment.
+- backends: interp, llvm.
+- caps: net(py), net(node).
+- notes: explicit `http.get` status/error propagation; keepalive tuned in v0.1.5.1.
+
+### v0.1.6
+
+- focus: browser networking for JS-rendered sources.
+- backends: interp, llvm.
+- caps: net(py), net(node), net(browser).
+- notes: Playwright Chromium headless driver (`NOVA_NET_DRIVER=browser`).
+
+Agent context generated via `nova agt init` includes capability hints aligned with the current runtime version.
+
+## v0.1.6
 
 ### Backends
 
@@ -20,8 +59,8 @@ nova --version
 ### Net drivers
 
 - `py` (default): `requests`
-- `node` (opcional): Node.js 18+ con `fetch` nativo
-- `node` usa worker keepalive (JSONL por stdin/stdout), sin spawn por request
+- `node`: worker keepalive JSONL (Node.js 18+)
+- `browser`: Playwright Chromium headless con keepalive
 
 Selector por entorno:
 
@@ -35,20 +74,22 @@ export NOVA_NET_DRIVER=node
 nova serve demo/llvm_serve_profile.nv --cap net
 ```
 
-PowerShell:
-
-```powershell
-$env:NOVA_NET_DRIVER="node"
+```bash
+export NOVA_NET_DRIVER=browser
 nova serve demo/llvm_serve_profile.nv --cap net
 ```
 
-Contrato de `http.get` (sin cambios):
-
 PowerShell:
 
 ```powershell
-$env:NOVA_NET_DRIVER="node"
+$env:NOVA_NET_DRIVER="browser"
 nova serve demo/llvm_serve_profile.nv --cap net
+```
+
+Requisito browser driver (una vez):
+
+```bash
+python -m playwright install chromium
 ```
 
 Contrato de `http.get` (sin cambios):

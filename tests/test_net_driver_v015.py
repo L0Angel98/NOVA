@@ -54,11 +54,13 @@ class NovaNetDriverV015Tests(unittest.TestCase):
             os.environ.pop("NOVA_NET_DRIVER", None)
             with patch("nova.cap.net.py.http_get", return_value={"st": 200, "hd": {}, "bd": "ok"}) as py_get:
                 with patch("nova.cap.net.node.http_get", return_value={"st": 200, "hd": {}, "bd": "bad"}) as node_get:
-                    out = http_get(f"{self.base_url}/ok")
+                    with patch("nova.cap.net.browser.http_get", return_value={"st": 200, "hd": {}, "bd": "bad2"}) as browser_get:
+                        out = http_get(f"{self.base_url}/ok")
         self.assertEqual(out["st"], 200)
         self.assertEqual(out["bd"], "ok")
         py_get.assert_called_once()
         node_get.assert_not_called()
+        browser_get.assert_not_called()
 
     def test_node_driver_is_selected_by_env(self) -> None:
         with patch.dict(os.environ, {"NOVA_NET_DRIVER": "node"}, clear=False):
@@ -67,12 +69,19 @@ class NovaNetDriverV015Tests(unittest.TestCase):
         self.assertEqual(out["bd"], "ok-node")
         node_get.assert_called_once()
 
+    def test_browser_driver_is_selected_by_env(self) -> None:
+        with patch.dict(os.environ, {"NOVA_NET_DRIVER": "browser"}, clear=False):
+            with patch("nova.cap.net.browser.http_get", return_value={"st": 200, "hd": {}, "bd": "ok-browser"}) as browser_get:
+                out = http_get(f"{self.base_url}/ok")
+        self.assertEqual(out["bd"], "ok-browser")
+        browser_get.assert_called_once()
+
     def test_invalid_driver_name_is_explicit(self) -> None:
         with patch.dict(os.environ, {"NOVA_NET_DRIVER": "bad"}, clear=False):
             with self.assertRaises(HttpCapError) as ctx:
                 http_get(f"{self.base_url}/ok")
         self.assertEqual(ctx.exception.code, "NET_INPUT")
-        self.assertIn("expected py|node", ctx.exception.msg)
+        self.assertIn("expected py|node|browser", ctx.exception.msg)
 
     def test_node_driver_missing_node_is_explicit(self) -> None:
         with patch.dict(os.environ, {"NOVA_NET_DRIVER": "node"}, clear=False):
