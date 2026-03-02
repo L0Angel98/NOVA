@@ -1,6 +1,6 @@
 # NOVA Examples v0.1.2
 
-Este archivo contiene ejemplos declarativos (no ejecutables) consistentes con `SPEC.md`.
+Ejemplos declarativos consistentes con `SPEC.md` (contrato minimo v0.1).
 
 ## 1) CRUD JSON
 
@@ -18,7 +18,11 @@ mdl users_api v"0.1.2" rst<any, err> {
     tb users
     whe active == tru
     ord id asc
-    lim num20
+    if ctx.q.n == nul {
+      lim num20
+    } els {
+      lim to_num(ctx.q.n)
+    }
     rst.ok(db.read())
   }
 
@@ -39,7 +43,7 @@ mdl users_api v"0.1.2" rst<any, err> {
 }
 ```
 
-## 2) CRUD TOON tabular
+## 2) CRUD TOON
 
 ```nova
 mdl tickets_api v"0.1.2" rst<any, err> {
@@ -76,7 +80,7 @@ mdl tickets_api v"0.1.2" rst<any, err> {
 }
 ```
 
-Ejemplo de payload TOON tabular:
+Payload TOON tabular:
 
 ```toon
 @toon v1
@@ -86,7 +90,7 @@ Ejemplo de payload TOON tabular:
 |2|"Checkout timeout"|"resolved"|
 ```
 
-## 3) Ejemplo con `match`
+## 3) `match` + `err`
 
 ```nova
 mdl health_api v"0.1.2" rst<any, err> {
@@ -106,9 +110,7 @@ mdl health_api v"0.1.2" rst<any, err> {
         msg: "database is down"
       }
     } els {
-      rst.ok({
-        status: level
-      })
+      rst.ok({ status: level })
     }
   }
 }

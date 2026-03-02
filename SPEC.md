@@ -49,7 +49,7 @@ Elementos estandar del runtime:
 - Namespaces reservados: `ctx`, `db`.
 - Builtin: `to_num(value)`.
 
-Reglas:
+## Lexical structure
 
 - `ctx` y `db` no pueden declararse como variables de usuario.
 - `to_num` es parte del contrato minimo de runtime.
