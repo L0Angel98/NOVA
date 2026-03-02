@@ -1,0 +1,10 @@
+mdl llvm_serve_profile v"0.1.4" rst<any, err> {
+  rte "/profile" GET json {
+    cap [net]
+    let pg = cap http.get("https://angelvlqz.onrender.com/")
+    let ti = cap html.tte(pg)
+    let h1 = cap html.sct(pg, "h1")
+    rst.ok({ti: ti, h1: h1, st: pg.st})
+  }
+}
+

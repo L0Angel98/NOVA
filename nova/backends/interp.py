@@ -7,7 +7,7 @@ import sys
 from typing import Any, Dict, Set, Tuple
 
 from nova.cap import DbSqliteCap, DbSqliteError, HttpCapError, html_sct, html_tte, http_get
-from nova.ir.nodes import IrArr, IrCall, IrExpr, IrId, IrJson, IrLet, IrMdl, IrObj, IrRstErr, IrRstOk, IrStmt
+from nova.ir.nodes import IrArr, IrCall, IrCap, IrExpr, IrId, IrJson, IrLet, IrMdl, IrObj, IrRstErr, IrRstOk, IrStmt
 
 from .base import BackendBuildResult, BackendError
 
@@ -59,6 +59,9 @@ class _IrVm:
                 if s is None:
                     raise BackendError("invalid let node")
                 self.env[s.n] = self._eval_expr(s.v)
+                continue
+            if kind == "cap":
+                _ = stmt if isinstance(stmt, IrCap) else None
                 continue
             if kind == "call":
                 s = stmt if isinstance(stmt, IrCall) else None
@@ -188,4 +191,3 @@ class _IrVm:
                 raise BackendError(str(exc)) from exc
 
         raise BackendError(f"unsupported IR call '{fn}'")
-

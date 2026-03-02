@@ -12,8 +12,7 @@ class GoBackend:
     name = "go"
 
     def build(self, *, ir: IrMdl, ir_path: Path, src_path: Path, out_dir: Path, caps: Set[str]) -> BackendBuildResult:
-        raise BackendError("go backend is a v0.1.3 stub; use --b interp or --b llvm")
+        raise BackendError("go backend is a v0.1.4 stub; use --b interp or --b llvm")
 
     def run(self, *, ir: IrMdl, ir_path: Path, src_path: Path, out_dir: Path, caps: Set[str]) -> int:
-        raise BackendError("go backend is a v0.1.3 stub; use --b interp or --b llvm")
-
+        raise BackendError("go backend is a v0.1.4 stub; use --b interp or --b llvm")

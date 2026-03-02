@@ -1,4 +1,3 @@
 """Version metadata for NOVA."""
 
-VERSION = "0.1.3"
-
+VERSION = "0.1.4"

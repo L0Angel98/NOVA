@@ -18,8 +18,9 @@ class LlvmBackend:
         out_dir.mkdir(parents=True, exist_ok=True)
         suffix = ".exe" if platform.system().lower().startswith("win") else ""
         artifact = out_dir / f"{src_path.stem}{suffix}"
+        self._prepare_artifact_paths(artifact)
         compiler = self._resolve_compiler()
-        cmd = [str(compiler), "--ir", str(ir_path), "--out", str(artifact)]
+        cmd = [str(compiler), "build", "--ir", str(ir_path), "--out", str(artifact)]
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
             detail = (proc.stderr or proc.stdout).strip()
@@ -28,7 +29,10 @@ class LlvmBackend:
 
     def run(self, *, ir: IrMdl, ir_path: Path, src_path: Path, out_dir: Path, caps: Set[str]) -> int:
         result = self.build(ir=ir, ir_path=ir_path, src_path=src_path, out_dir=out_dir, caps=caps)
-        proc = subprocess.run([str(result.artifact)], capture_output=False)
+        cmd = [str(result.artifact)]
+        for cap in sorted(caps):
+            cmd.extend(["--cap", cap])
+        proc = subprocess.run(cmd, capture_output=False)
         return int(proc.returncode)
 
     def _resolve_compiler(self) -> Path:
@@ -52,3 +56,12 @@ class LlvmBackend:
     def _crate_dir(self) -> Path:
         return Path(__file__).resolve().parents[2] / "compiler" / "llvm"
 
+    def _prepare_artifact_paths(self, artifact: Path) -> None:
+        sidecar = artifact.with_name(f"{artifact.name}.ir.json")
+        for target in (artifact, sidecar):
+            if not target.exists():
+                continue
+            try:
+                target.unlink()
+            except PermissionError as exc:
+                raise BackendError(f"output file is in use: {target}") from exc

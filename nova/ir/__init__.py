@@ -1,7 +1,7 @@
 """NOVA stable IR (v0.1.3) helpers."""
 
 from .emit import IrEmitError, emit_ir
-from .nodes import IrArr, IrCall, IrExpr, IrId, IrJson, IrLet, IrMdl, IrObj, IrRstErr, IrRstOk, IrRte, IrStmt
+from .nodes import IrArr, IrCall, IrCap, IrExpr, IrId, IrJson, IrLet, IrMdl, IrObj, IrRstErr, IrRstOk, IrRte, IrStmt
 from .ser import ir_to_json, ir_to_obj
 
 __all__ = [
@@ -14,6 +14,7 @@ __all__ = [
     "IrStmt",
     "IrExpr",
     "IrLet",
+    "IrCap",
     "IrCall",
     "IrRstOk",
     "IrRstErr",
@@ -22,4 +23,3 @@ __all__ = [
     "IrObj",
     "IrArr",
 ]
-

@@ -1,0 +1,14 @@
+mdl llvm_db v"0.1.4" rst<any, err> {
+  rte "/db" GET json {
+    cap [db]
+    let h = db.opn("out/llvm_demo.db")
+    db.qry(h, "create table if not exists it (id integer primary key, nm text)")
+    db.qry(h, "delete from it")
+    db.qry(h, "insert into it (nm) values (?)", ["ada"])
+    db.qry(h, "insert into it (nm) values (?)", ["lin"])
+    let it = db.qry(h, "select id, nm from it order by id asc")
+    db.cls(h)
+    rst.ok({n: num2, it: it})
+  }
+}
+
