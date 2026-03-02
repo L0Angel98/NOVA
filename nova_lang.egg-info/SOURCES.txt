@@ -24,6 +24,7 @@ nova/cap/html_cap.py
 nova/cap/http_cap.py
 nova/cap/net/__init__.py
 nova/cap/net/base.py
+nova/cap/net/browser.py
 nova/cap/net/node.py
 nova/cap/net/node_fetch.mjs
 nova/cap/net/node_worker.mjs
@@ -36,6 +37,7 @@ nova_lang.egg-info/PKG-INFO
 nova_lang.egg-info/SOURCES.txt
 nova_lang.egg-info/dependency_links.txt
 nova_lang.egg-info/entry_points.txt
+nova_lang.egg-info/requires.txt
 nova_lang.egg-info/top_level.txt
 tests/test_agent_context.py
 tests/test_cap_enforcement.py
@@ -43,7 +45,9 @@ tests/test_caps_v013.py
 tests/test_checker.py
 tests/test_cli_v013.py
 tests/test_db_ir.py
+tests/test_experimental_cap_scraping.py
 tests/test_llvm_native_v014.py
+tests/test_net_driver_browser_v016.py
 tests/test_net_driver_keepalive_v0151.py
 tests/test_net_driver_v015.py
 tests/test_roundtrip.py

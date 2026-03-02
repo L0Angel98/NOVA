@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import os
 from typing import Any, Dict
 
+from .net import browser as browser_driver
 from .net import node as node_driver
 from .net import py as py_driver
 from .net.base import NetDriverError, ensure_http_payload
@@ -32,7 +33,7 @@ def http_get(url: Any, h: Any = None, t: Any = None) -> Dict[str, Any]:
         if timeout <= 0:
             raise HttpCapError("NET_INPUT", "timeout must be > 0")
 
-    headers: Dict[str, str] = {"User-Agent": "nova/0.1.5.1"}
+    headers: Dict[str, str] = {"User-Agent": "nova/0.1.6"}
     if h is not None:
         if not isinstance(h, dict):
             raise HttpCapError("NET_INPUT", "headers must be object")
@@ -62,5 +63,7 @@ def _resolve_driver(name: str):
         return py_driver.http_get
     if name == "node":
         return node_driver.http_get
-    raise HttpCapError("NET_INPUT", f"unsupported net driver '{name}' (expected py|node)")
+    if name == "browser":
+        return browser_driver.http_get
+    raise HttpCapError("NET_INPUT", f"unsupported net driver '{name}' (expected py|node|browser)")
 

@@ -14,6 +14,9 @@ from urllib.parse import parse_qs, urlparse
 
 from bs4 import BeautifulSoup
 
+from .cap.db_sqlite import DbSqliteCap, DbSqliteError
+from .cap.html_cap import html_sct, html_tte
+from .cap.http_cap import HttpCapError, http_get
 from .db_ir import (
     DbIr,
     DbIrError,

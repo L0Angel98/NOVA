@@ -1,4 +1,4 @@
-# NOVA v0.1.5.1
+﻿# NOVA v0.1.6
 
 NOVA es un DSL IA-first para APIs y scripting con IR estable y backends pluggable.
 
@@ -9,7 +9,7 @@ pip install -e .
 nova --version
 ```
 
-## v0.1.5.1
+## v0.1.6
 
 ### Backends
 
@@ -20,8 +20,8 @@ nova --version
 ### Net drivers
 
 - `py` (default): `requests`
-- `node` (opcional): Node.js 18+ con `fetch` nativo
-- `node` usa worker keepalive (JSONL por stdin/stdout), sin spawn por request
+- `node`: worker keepalive JSONL (Node.js 18+)
+- `browser`: Playwright Chromium headless con keepalive
 
 Selector por entorno:
 
@@ -35,20 +35,22 @@ export NOVA_NET_DRIVER=node
 nova serve demo/llvm_serve_profile.nv --cap net
 ```
 
-PowerShell:
-
-```powershell
-$env:NOVA_NET_DRIVER="node"
+```bash
+export NOVA_NET_DRIVER=browser
 nova serve demo/llvm_serve_profile.nv --cap net
 ```
 
-Contrato de `http.get` (sin cambios):
-
 PowerShell:
 
 ```powershell
-$env:NOVA_NET_DRIVER="node"
+$env:NOVA_NET_DRIVER="browser"
 nova serve demo/llvm_serve_profile.nv --cap net
+```
+
+Requisito browser driver (una vez):
+
+```bash
+python -m playwright install chromium
 ```
 
 Contrato de `http.get` (sin cambios):

@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nova-lang"
-version = "0.1.5.1"
+version = "0.1.6"
 description = "NOVA v0.1 IA-first DSL tooling"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "requests",
   "beautifulsoup4",
+  "playwright",
 ]
 
 [project.scripts]
