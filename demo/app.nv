@@ -4,28 +4,28 @@
   }
   rte "/items" GET json {
     tb items
-    if query.n == nul {
+    if ctx.q.n == nul {
       lim num50
     }
     els {
-      lim to_num(query.n)
+      lim to_num(ctx.q.n)
     }
     ord id asc
-    rst.ok({ctx: ctx, headers: headers, items: db.read(), query: query})
+    rst.ok({ctx: ctx, headers: ctx.h, items: db.read(), query: ctx.q})
   }
   rte "/items" POST json {
     tb items
-    grd body, body.name : "BAD_REQUEST"
-    rst.ok(db.create(body))
+    grd ctx.b, ctx.b.name : "BAD_REQUEST"
+    rst.ok(db.create(ctx.b))
   }
   rte "/items/:id" PUT json {
     tb items
-    whe id == params.id
-    rst.ok(db.update(body))
+    whe id == ctx.p.id
+    rst.ok(db.update(ctx.b))
   }
   rte "/items/:id" DELETE json {
     tb items
-    whe id == params.id
+    whe id == ctx.p.id
     rst.ok(db.delete())
   }
   rte "/items.toon" GET toon {
@@ -35,7 +35,7 @@
   }
   rte "/items.toon" POST toon {
     tb items
-    grd body, body.name : "BAD_REQUEST"
-    rst.ok(db.create(body))
+    grd ctx.b, ctx.b.name : "BAD_REQUEST"
+    rst.ok(db.create(ctx.b))
   }
 }

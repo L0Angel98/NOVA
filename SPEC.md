@@ -1,280 +1,157 @@
-﻿# NOVA Language Specification v0.1
+# NOVA Language Specification v0.1.2
 
-Estado: Borrador normativo (v0.1)
-Alcance: DSL para APIs y scripting, optimizado para IA-first.
-No-alcance: compilador, runtime, VM, transporte HTTP real, motor DB real.
+Status: normative standard contract (minimum v0.1).
+Scope: IA-first DSL for APIs and scripting.
+Non-scope: VM internals, transport implementation details, and physical DB engine semantics.
 
-## 1. Filosofia IA-first
+## Overview / Goals
 
-NOVA v0.1 prioriza:
+NOVA v0.1 standardizes a compact surface for human + AI collaboration:
 
-- Menos tokens por intencion.
-- Menos ambiguedad sintactica.
-- Keywords canonicas, cortas y estables.
-- Flujo declarativo para API + DB.
-- Salida estructurada en `json` y `toon`.
-- Contexto persistente de proyecto en `agent.toon`.
+- Fewer tokens per intent.
+- Stable canonical keywords (no synonyms in source standard).
+- Declarative API + DB flow.
+- Predictable response contract with `rst`/`err`.
+- Low-friction context access via short aliases.
 
-Reglas IA-first:
+Design rules for v0.1:
 
-- No se permiten sinonimos de keywords canonicas.
-- Una keyword tiene un solo rol semantico.
-- Se evita sobrecarga de sintaxis (menos magia, mas explicitud).
-- Cuando una regla no exista en v0.1, debe declararse como duda abierta.
+- One keyword, one semantic role.
+- No keyword overloading.
+- If behavior is not defined here, it is out of standard scope.
 
-## 2. Keywords canonicas (abreviadas)
+## Versioning (v0.1.2 notes)
 
-Reservadas en v0.1 (case-sensitive):
+- `v0.1.0`: initial language surface (`rte`, `tb/whe/lim/ord`, `cap`, `rst/err`).
+- `v0.1.1`: `str"..."` removed from canonical syntax (plain `"..."` is canonical).
+- `v0.1.2`: breaking change: HTTP methods are keywords (no quoted method strings).
 
-- `let`
-- `if`
-- `els`
-- `match`
-- `asy`
-- `awt`
-- `rte`
-- `json`
-- `toon`
-- `tb`
-- `whe`
-- `lim`
-- `ord`
-- `rst`
-- `err`
-- `cap`
-- `str`
-- `num`
-- `tru`
-- `fal`
-- `nul`
-
-Notas:
-
-- `rst` se escribe en minusculas.
-- El resto de keywords se escriben en minusculas.
-- Ninguna keyword puede usarse como identificador.
-
-## 3. Literales (`str`/`num`/`tru`/`fal`/`nul`)
-
-### 3.1 `str`
-
-- Cadena entre comillas dobles.
-- Ejemplo: `"hola"`.
-
-### 3.2 `num`
-
-- Entero o decimal en base 10.
-- Ejemplos: `7`, `3.14`, `-2`.
-
-### 3.3 Booleanos
-
-- `tru` para verdadero.
-- `fal` para falso.
-
-### 3.4 Nulo
-
-- `nul` representa ausencia de valor.
-
-## 4. `let` inmutable
-
-`let` declara binding inmutable:
+v0.1.2 source rule for routes:
 
 ```nova
-let nombre = "NOVA"
-let max_items = 100
-```
-
-Reglas:
-
-- Un `let` no puede reasignarse.
-- La mutacion directa de `let` no existe en v0.1.
-- Si hay error de redeclaracion en mismo alcance, se reporta como `err`.
-
-Duda abierta v0.1:
-
-- Sombreado (shadowing) entre alcances no esta definido de forma cerrada.
-
-## 5. `if` / `els`
-
-Forma canonica:
-
-```nova
-if <condicion> {
-  <bloque>
-} els {
-  <bloque>
+rte "/path" GET json {
+  rst.ok({ ok: tru })
 }
 ```
 
-Reglas:
+## Lexical structure
 
-- `els` es opcional.
-- La condicion debe evaluar a `tru` o `fal`.
-- Encadenamiento se expresa con `els if`.
+### Source units
 
-## 6. `match`
+- Source file extension: `.nv`.
+- Newlines and `;` can separate statements.
+- Comments:
+  - `# ...`
+  - `// ...`
+  - `/* ... */`
 
-Forma canonica:
+### Identifiers
+
+- Pattern: letter/underscore start, then alphanumeric/underscore.
+- Case-sensitive.
+- Identifiers cannot reuse reserved keywords.
+- Runtime namespaces `ctx` and `db` are reserved and cannot be declared as user variables.
+
+### Literals
+
+- `str`: `"text"`
+- `num`: `7`, `-2`, `3.14`, or prefixed compact forms like `num50`
+- `bool`: `tru`, `fal`
+- `nul`: null literal
+
+### Core statements (minimum v0.1)
+
+- Immutable bind: `let`
+- Branching: `if ... els ...`
+- Pattern matching: `match`
+- Async primitives: `asy`, `awt`
+- Capability declaration: `cap`
+
+## Keywords (reserved)
+
+Reserved keywords in v0.1.2:
+
+- Module/system: `mdl`, `imp`, `pub`, `fn`
+- Control flow: `let`, `if`, `els`, `match`, `asy`, `awt`
+- API/runtime: `rte`, `rst`, `err`, `grd`, `cap`
+- DB IR: `tb`, `whe`, `lim`, `ord`
+- Literals: `tru`, `fal`, `nul`
+- HTTP method keywords: `GET`, `POST`, `PUT`, `DEL`, `PAT`, `OPT`, `HED`
+
+Rules:
+
+- Reserved keywords cannot be used as identifiers.
+- `mdl` and `grd` are reserved language keywords.
+- Long context names (`query`, `params`, `headers`, `body`) are not reserved keywords.
+
+## Runtime namespaces & builtins (standard v0.1)
+
+Standard runtime contract requires these names:
+
+- `ctx`: request context namespace (reserved).
+- `db`: database facade namespace (reserved).
+- `to_num(value)`: builtin numeric conversion.
+
+Rules:
+
+- `ctx` and `db` must not be used as user variable names.
+- `to_num` is a standard builtin available in route/module execution scope.
+- Standard `ctx` metadata keys include `request_id`, `method`, `path`, and `timestamp_ms`.
+- Standard `db` facade exposes `read`, `create`, `update`, `delete`, and `plan`.
+
+## HTTP routing (rte + methods)
+
+Canonical route form in v0.1.2:
 
 ```nova
-match <expresion> {
-  <patron> => <resultado>
-  _ => <resultado_default>
+rte "/users" GET json {
+  rst.ok(db.read())
+}
+
+rte "/users" POST json {
+  grd ctx.b, ctx.b.name : "BAD_REQUEST"
+  rst.ok(db.create(ctx.b))
 }
 ```
 
-Patrones minimos normativos v0.1:
-
-- Literales (`str`, `num`, `tru`, `fal`, `nul`).
-- `_` como comodin.
-
-Reglas:
-
-- Se evalua de arriba hacia abajo.
-- Se toma la primera rama que coincide.
-- Si no hay coincidencia y no existe `_`, retorna `err` de no coincidencia.
-
-Duda abierta v0.1:
-
-- Patrones estructurales (objetos/tablas) no estan definidos.
-
-## 7. `asy` / `awt`
-
-### 7.1 `asy`
-
-Define bloque asincrono:
+Method-first reference notation (docs shorthand):
 
 ```nova
-let tarea = asy {
-  <bloque>
-}
+rte GET "/path" { ... }
+rte POST "/path" { ... }
 ```
 
-### 7.2 `awt`
+Method list supported by the v0.1.2 standard:
 
-Espera resultado asincrono:
+- `GET`
+- `POST`
+- `PUT`
+- `DEL`
+- `PAT`
+- `OPT`
+- `HED`
+
+Compatibility note:
+
+- Implementations may accept legacy aliases (`PATCH`, `DELETE`) for backward compatibility.
+
+Rules:
+
+- Methods are keywords, not quoted strings.
+- Route format is `json` or `toon`.
+- A route must end in a response value (`rst` or `err`).
+
+## Responses (rst) + Error format
+
+`rst` is the response envelope contract.
+
+Success form:
 
 ```nova
-let salida = awt tarea
+rst.ok({ id: 1 })
 ```
 
-Reglas:
-
-- `awt` solo aplica sobre resultado de `asy`.
-- Errores internos de `asy` propagan como `err`.
-
-Dudas abiertas v0.1:
-
-- Modelo formal de scheduler/event-loop no definido.
-- Politica de cancelacion/timeouts no definida.
-
-## 8. DB declarativa (`tb`, `whe`, `lim`, `ord`)
-
-v0.1 define un bloque declarativo de consulta/operacion sobre tabla:
-
-```nova
-tb users
-whe id == 1
-ord created_at desc
-lim 10
-```
-
-Semantica minima:
-
-- `tb <identificador>`: tabla objetivo.
-- `whe <condicion>`: filtro.
-- `ord <campo> <dir>`: orden (`asc` o `desc`).
-- `lim <num>`: limite de filas.
-
-Reglas:
-
-- `tb` es obligatorio en operaciones DB.
-- `whe`, `ord`, `lim` son opcionales.
-- `lim` debe ser `num` entero positivo.
-
-CRUD en v0.1:
-
-- Convencion provisional v0.1: la accion CRUD se expresa en el payload (`op`) del bloque de formato (`json` o `toon`) para evitar introducir keywords no especificadas.
-- Valores permitidos para `op` en esta convencion: `"create"`, `"read"`, `"update"`, `"delete"`.
-
-Dudas abiertas v0.1:
-
-- No se define SQL exacto generado.
-- No se define transaccionalidad.
-- No se define validacion de esquema fisico.
-
-## 9. Routes (`rte`)
-
-Forma canonica:
-
-```nova
-rte "/path" "METHOD" <formato> {
-  <bloque>
-}
-```
-
-Donde:
-
-- Convencion provisional v0.1: `"METHOD"` es `"GET"`, `"POST"`, `"PUT"`, `"PATCH"` o `"DELETE"`.
-- `<formato>` es `json` o `toon`.
-
-Reglas:
-
-- Cada `rte` define una unidad declarativa de endpoint.
-- `cap` puede declararse dentro del `rte` para control de capacidades.
-- Una `rte` retorna `rst`.
-
-Duda abierta v0.1:
-
-- Resolucion de conflictos entre rutas superpuestas no definida.
-
-## 10. Formats (`json`, `toon`)
-
-## 10.1 `json`
-
-Bloque estructurado estilo objeto:
-
-```nova
-json {
-  op: "read"
-  data: { id: 1, name: "Ada" }
-}
-```
-
-## 10.2 `toon`
-
-Formato tabular orientado a lectura por IA/humano.
-
-Forma minima v0.1:
-
-```nova
-toon users {
-| id | name | active |
-| 1  | "Ada" | tru |
-}
-```
-
-Reglas TOON:
-
-- Primera fila: cabecera.
-- Filas siguientes: registros.
-- Numero de celdas por fila debe coincidir con cabecera.
-
-Dudas abiertas v0.1:
-
-- Escape avanzado de celdas TOON no definido.
-- Tipado implicito de celdas TOON no definido en detalle.
-
-## 11. Errors (`rst`, `err`)
-
-`rst` encapsula salida exitosa o error.
-
-Contrato minimo:
-
-- Exito: variante `ok` con valor `json` o `toon`.
-- Falla: `err` con `code` y `msg`.
-
-Forma de error:
+Error form:
 
 ```nova
 err {
@@ -283,62 +160,61 @@ err {
 }
 ```
 
-Reglas:
+Rules:
 
-- Toda `rte` finaliza en `rst`.
-- Cualquier fallo de parseo/validacion/capacidad retorna `err`.
+- `err` payload minimum keys: `code`, `msg`.
+- `rst`/`err` values are final route outputs.
+- Runtime serialization can target `json` or `toon`, but semantic fields must remain stable.
 
-Duda abierta v0.1:
+## DB Query IR (tb/whe/lim/ord)
 
-- Forma canonica exacta de serializacion de `rst` no cerrada.
-
-## 12. Capabilities (`cap`)
-
-`cap` declara permisos requeridos para ejecutar un bloque/ruta.
-
-Forma canonica:
+Declarative query IR is built from these statements:
 
 ```nova
-cap ["users.read", "users.write"]
+tb users
+whe active == tru
+ord created_at desc
+lim num10
 ```
 
-Reglas:
+Semantics:
 
-- Si falta una capacidad requerida, el resultado es `err` de autorizacion.
-- `cap` aplica antes de DB/side-effects.
+- `tb <target>`: required DB target declaration.
+- `whe <condition>`: optional filter.
+- `ord <field> <asc|desc>`: optional sort.
+- `lim <num>`: optional positive row limit.
 
-Duda abierta v0.1:
+Block shorthand is valid for query composition:
 
-- Modelo de herencia/composicion de capacidades no definido.
+```nova
+tb users.q {
+  whe active == tru
+  ord id asc
+  lim num5
+}
+```
 
-## 13. Agent context (`agent.toon`)
+## Context access (aliases 1 silaba)
 
-`agent.toon` es memoria de proyecto y contexto operativo para IA.
+### Context aliases (standard)
 
-Objetivo:
+Standard aliases (fixed mapping):
 
-- Mantener decisiones de arquitectura del DSL.
-- Guardar convenciones de rutas, formatos y capacidades.
-- Registrar dudas abiertas y acuerdos de equipo.
+- `ctx.q` => query
+- `ctx.p` => params
+- `ctx.h` => headers
+- `ctx.b` => body
 
-Reglas minimas:
+Standard rules:
 
-- Debe existir en la raiz del proyecto.
-- Debe usar formato `toon` tabular.
-- Debe ser legible por humano e IA con bajo costo de tokens.
+- Source code should use `ctx.q/ctx.p/ctx.h/ctx.b` in canonical examples and guides.
+- Long names may exist internally in implementations, but the language standard uses aliases.
+- `query`, `params`, `headers`, `body` are not reserved keywords.
 
-## 14. Dudas abiertas v0.1 (sin inventar)
+## Open items out of v0.1 scope
 
-Los siguientes puntos quedan explicitamente fuera por falta de definicion en el requerimiento:
-
-- Gramatica formal completa (precedencia de operadores y asociatividad).
-- Sistema de tipos mas alla de literales basicos.
-- Parametros de ruta (`/users/:id`) y binding formal.
-- Esquema formal de entrada/salida por metodo HTTP.
-- Manejo de transacciones y aislamiento DB.
-- Versionado de API y estrategia de migraciones.
-- Modelo exacto de concurrencia para `asy`.
-- Interoperabilidad binaria o FFI.
-
-Mientras estos puntos no se definan, NOVA v0.1 debe tratarse como especificacion funcional minima, no como definicion cerrada de implementacion.
-
+- Full formal operator precedence spec.
+- Full type system beyond v0.1 primitives and result envelope.
+- Exact transaction/isolation DB semantics.
+- Route conflict resolution policy for overlapping patterns.
+- Scheduler/cancellation semantics for async execution.
