@@ -1,4 +1,4 @@
-﻿@toon v1
+@toon v1
 @type table
 @rows 24
 |key|value|origin|
@@ -16,14 +16,13 @@
 |"spec_version"|"0.1"|"manual"|
 |"sys.agent.version"|"agent.v0.1"|"auto"|
 |"sys.cap.model"|"static-default-deny"|"auto"|
-|"sys.commands"|"parse,fmt,check,serve,agt pack,agt sync,agt chk"|"auto"|
+|"sys.commands"|"parse,fmt,check,serve,agt init,agt pack,agt sync,agt chk"|"auto"|
 |"sys.project.name"|"nova"|"auto"|
-|"sys.snapshot.digest"|"90405a0eebf1ec5663de2650"|"auto"|
-|"sys.snapshot.file_count"|"27"|"auto"|
-|"sys.snapshot.nv_file_count"|"1"|"auto"|
+|"sys.snapshot.digest"|"fede379163986a4862e2d014"|"auto"|
+|"sys.snapshot.file_count"|"32"|"auto"|
+|"sys.snapshot.nv_file_count"|"2"|"auto"|
 |"sys.snapshot.parse_error_count"|"0"|"auto"|
-|"sys.snapshot.route_count"|"7"|"auto"|
-|"sys.snapshot.synced_at_utc"|"2026-03-01T23:39:34Z"|"auto"|
-|"sys.snapshot.test_count"|"24"|"auto"|
+|"sys.snapshot.route_count"|"8"|"auto"|
+|"sys.snapshot.synced_at_utc"|"2026-03-02T16:47:39Z"|"auto"|
+|"sys.snapshot.test_count"|"29"|"auto"|
 |"team_convention"|"Usar keywords canonicas sin sinonimos"|"manual"|
-
