@@ -9,7 +9,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class NovaCliV015Tests(unittest.TestCase):
+class NovaCliV0151Tests(unittest.TestCase):
     def test_version_flag(self) -> None:
         proc = subprocess.run(
             ["python", "-m", "nova", "--version"],
@@ -18,7 +18,7 @@ class NovaCliV015Tests(unittest.TestCase):
             cwd=ROOT,
         )
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
-        self.assertIn("0.1.5", proc.stdout)
+        self.assertIn("0.1.5.1", proc.stdout)
 
     def test_run_db_sqlite_demo_interp(self) -> None:
         with tempfile.TemporaryDirectory() as td:

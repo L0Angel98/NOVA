@@ -1,4 +1,4 @@
-# NOVA v0.1.5
+# NOVA v0.1.5.1
 
 NOVA es un DSL IA-first para APIs y scripting con IR estable y backends pluggable.
 
@@ -9,7 +9,7 @@ pip install -e .
 nova --version
 ```
 
-## v0.1.5
+## v0.1.5.1
 
 ### Backends
 
@@ -21,6 +21,7 @@ nova --version
 
 - `py` (default): `requests`
 - `node` (opcional): Node.js 18+ con `fetch` nativo
+- `node` usa worker keepalive (JSONL por stdin/stdout), sin spawn por request
 
 Selector por entorno:
 

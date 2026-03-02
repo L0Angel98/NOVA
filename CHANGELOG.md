@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.5.1 (2026-03-02)
+
+- node net driver now keepalive; reduced overhead.
+- `NOVA_NET_DRIVER=node` ahora arranca un worker persistente (JSONL) al primer `http.get`.
+- El worker se reutiliza para llamadas subsecuentes y cierra limpio al salir del proceso.
+- Reinicio controlado: si el worker cae, se reinicia una vez y se reintenta 1 request.
+- Contrato de salida sin cambios: `{st, hd, bd}` con errores explicitos.
+
 ## v0.1.5 (2026-03-02)
 
 - add optional node-based net driver for improved scraping compatibility.
