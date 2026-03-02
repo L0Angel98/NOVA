@@ -37,6 +37,11 @@ IGNORED_DIRS = {
 }
 
 REQUIRED_KEYS = ["v", "rt", "sum", "api", "cap", "m", "dep", "chg", "ts"]
+NET_DRV_META = {
+    "net": ["py", "node", "browser"],
+    "sel": "env:NOVA_NET_DRIVER",
+    "nt": "browser=headless,install_chromium,js",
+}
 
 
 @dataclass(frozen=True)
@@ -69,6 +74,13 @@ class AgentInitReport:
     guide_written: bool
     agent_rows: int
     dictionary_rows: int
+
+
+@dataclass(frozen=True)
+class AgentRow:
+    key: str
+    value: str
+    origin: str  # manual | auto
 
 
 class AgentContextError(ValueError):
@@ -125,7 +137,12 @@ def sync_agent(root: Path, agent_path: Path | None = None) -> AgentSyncReport:
     if not path.exists():
         _init_index(root, path, force=True)
 
-    previous = _read_index(path)
+    try:
+        previous = _read_index(path)
+    except AgentContextError:
+        # agt init may leave a doc table; reset to idx object before sync.
+        _init_index(root, path, force=True)
+        previous = _read_index(path)
     files = list(_iter_project_files(root))
     routes = _scan_routes(root, files)
     caps = _scan_caps(root, files)
@@ -143,11 +160,12 @@ def sync_agent(root: Path, agent_path: Path | None = None) -> AgentSyncReport:
         chg = chg[-20:]
 
     idx = {
-        "v": "0.1.3",
+        "v": "0.1.6",
         "rt": ".",
         "sum": summary,
         "api": routes,
         "cap": caps,
+        "nd": NET_DRV_META,
         "m": fmap,
         "dep": deps,
         "chg": chg,
@@ -212,11 +230,12 @@ def _init_index(root: Path, path: Path, *, force: bool) -> bool:
     if path.exists() and not force:
         return False
     template = {
-        "v": "0.1.3",
+        "v": "0.1.6",
         "rt": ".",
         "sum": [],
         "api": [],
         "cap": [],
+        "nd": NET_DRV_META,
         "m": {},
         "dep": [],
         "chg": [{"at": _utc_now_iso(), "op": "init"}],
@@ -279,9 +298,78 @@ def _scan_caps(root: Path, files: List[Path]) -> List[str]:
     for file in files:
         if file.suffix.lower() != ".nv":
             continue
-        origin = row.origin if row.origin in {"manual", "auto"} else "manual"
-        by_key[key] = AgentRow(key=key, value=_to_stable_value(row.value), origin=origin)
-    return sorted(by_key.values(), key=lambda row: row.key)
+        try:
+            ast = parse_nova(file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for node in _collect_nodes(ast, "CapStmt"):
+            caps.update(_caps_from_expr(node.get("value")))
+        for call in _collect_nodes(ast, "CallExpr"):
+            fn = _callee_name(call.get("callee"))
+            if fn.startswith("http.") or fn.startswith("net."):
+                caps.add("net")
+            if fn.startswith("html."):
+                caps.add("html")
+            if fn.startswith("db."):
+                caps.add("db")
+    return sorted(caps)
+
+
+def _scan_deps(root: Path) -> List[str]:
+    pyproject = root / "pyproject.toml"
+    if not pyproject.exists():
+        return []
+    text = pyproject.read_text(encoding="utf-8")
+
+    deps: List[str] = []
+    in_deps = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("dependencies") and "[" in stripped:
+            in_deps = True
+            continue
+        if in_deps and stripped.startswith("]"):
+            break
+        if in_deps:
+            item = stripped.strip(",").strip().strip('"').strip("'")
+            if item:
+                deps.append(item)
+    return deps
+
+
+def _build_summary(root: Path, files: List[Path], routes: List[Dict[str, Any]], caps: List[str]) -> List[str]:
+    nv_count = len([f for f in files if f.suffix.lower() == ".nv"])
+    py_count = len([f for f in files if f.suffix.lower() == ".py"])
+    md_count = len([f for f in files if f.suffix.lower() == ".md"])
+    demo_count = len([f for f in files if f.relative_to(root).as_posix().startswith("demo/")])
+
+    lines = [
+        f"project={root.name or root.as_posix()}",
+        f"files={len(files)}",
+        f"nv={nv_count}",
+        f"py={py_count}",
+        f"md={md_count}",
+        f"demo={demo_count}",
+        f"routes={len(routes)}",
+        f"caps={','.join(caps) if caps else '-'}",
+        f"ts={_utc_now_iso()}",
+    ]
+
+    top = [p.relative_to(root).as_posix() for p in sorted(files)[:8]]
+    for rel in top:
+        lines.append(f"f:{rel}")
+
+    if len(lines) < 10:
+        lines.append("sync=ok")
+    return lines[:20]
+
+
+def _default_language_guide_markdown(project_name: str) -> str:
+    return (
+        "# NOVA Language Notes\n\n"
+        f"Proyecto: {project_name}\n\n"
+        "Guia minima para agentes IA sobre sintaxis y capacidades del runtime.\n"
+    )
 
 
 def _to_stable_value(value: Any) -> str:
@@ -294,6 +382,17 @@ def _to_stable_value(value: Any) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _canonicalize_rows(rows: List[AgentRow]) -> List[AgentRow]:
+    by_key: Dict[str, AgentRow] = {}
+    for row in rows:
+        key = row.key.strip()
+        if key == "":
+            continue
+        origin = row.origin if row.origin in {"manual", "auto"} else "manual"
+        by_key[key] = AgentRow(key=key, value=_to_stable_value(row.value), origin=origin)
+    return sorted(by_key.values(), key=lambda row: row.key)
 
 
 def _utc_now_iso() -> str:
@@ -322,13 +421,14 @@ def _default_agent_rows(root: Path) -> List[AgentRow]:
     ns = {"ctx": "reserved", "db": "reserved"}
     cxa = {"q": "query", "p": "params", "h": "headers", "b": "body"}
     cap = {"net": "http.get", "html": ["tte", "sct"]}
+    nd = NET_DRV_META
     fs = {"ent": len(list(_iter_project_files(root))), "upd": _utc_now_iso()}
     fls = _important_files(root, max_items=30)
     tsk = ["sync", "chk", "pack"]
     legacy = {"routes": [], "tests": [], "synced_at_utc": ""}
 
     manual_rows = [
-        AgentRow(key="v", value="0.1.2", origin="manual"),
+        AgentRow(key="v", value="0.1.6", origin="manual"),
         AgentRow(key="k", value="agt", origin="manual"),
         AgentRow(key="gen", value=_to_stable_value(gen), origin="manual"),
         AgentRow(key="rt", value=".", origin="manual"),
@@ -337,6 +437,7 @@ def _default_agent_rows(root: Path) -> List[AgentRow]:
         AgentRow(key="ns", value=_to_stable_value(ns), origin="manual"),
         AgentRow(key="cxa", value=_to_stable_value(cxa), origin="manual"),
         AgentRow(key="cap", value=_to_stable_value(cap), origin="manual"),
+        AgentRow(key="nd", value=_to_stable_value(nd), origin="manual"),
         AgentRow(key="fs", value=_to_stable_value(fs), origin="manual"),
         AgentRow(key="fls", value=_to_stable_value(fls), origin="manual"),
         AgentRow(key="tsk", value=_to_stable_value(tsk), origin="manual"),
