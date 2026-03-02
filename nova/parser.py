@@ -21,6 +21,7 @@ BINARY_PRECEDENCE = {
 }
 
 UNARY_OPERATORS = {"-", "!"}
+ROUTE_METHOD_KEYWORDS = {"GET", "POST", "PUT", "DEL", "PAT", "OPT", "HED", "PATCH", "DELETE"}
 
 
 class ParseError(ValueError):
@@ -202,9 +203,25 @@ class Parser:
         return {"type": "GuardStmt", "targets": targets, "code": code}
 
     def _parse_route_statement(self) -> Dict[str, Any]:
-        path = self._parse_expression()
-        method = self._parse_expression()
-        fmt = self._parse_expression()
+        first = self._parse_expression()
+        path: Dict[str, Any]
+        method: Dict[str, Any]
+        fmt: Dict[str, Any] = {"type": "Identifier", "name": "json"}
+
+        self._skip_newlines()
+        if self._is_route_method_expr(first):
+            method = first
+            path = self._parse_expression()
+            self._skip_newlines()
+            if not self._check_symbol("{") and not self._check_symbol(":"):
+                fmt = self._parse_expression()
+        else:
+            path = first
+            method = self._parse_expression()
+            self._skip_newlines()
+            if not self._check_symbol("{") and not self._check_symbol(":"):
+                fmt = self._parse_expression()
+
         result_type: Optional[Dict[str, Any]] = None
         self._skip_newlines()
         if self._match_symbol(":"):
@@ -542,6 +559,9 @@ class Parser:
             if obj["type"] == "Identifier" and prop in {"get", "q"}:
                 return obj, prop
         return expr, None
+
+    def _is_route_method_expr(self, expr: Dict[str, Any]) -> bool:
+        return expr.get("type") == "Identifier" and expr.get("name") in ROUTE_METHOD_KEYWORDS
 
     def _is_object_field_start(self) -> bool:
         token = self._current()

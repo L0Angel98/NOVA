@@ -142,3 +142,28 @@ Reglas de estandar:
 - Los ejemplos oficiales deben usar `ctx.q`, `ctx.p`, `ctx.h`, `ctx.b`.
 - `query`, `params`, `headers`, `body` NO son keywords ni nombres reservados del lenguaje.
 - Aunque implementaciones internas mantengan nombres largos, la sintaxis estandar para demos/docs usa aliases `ctx.*`.
+
+## Experimental Capabilities (non-standard)
+
+Esta seccion es experimental y no forma parte del contrato minimo v0.1.
+
+- `cap http.get(url, h?, t?)`
+  - `url` requerido (`str`)
+  - `h` opcional (headers en `json`/`toon`)
+  - `t` opcional (`timeout_ms` como `num`)
+  - Requiere ejecutar runtime con `--cap net`
+- `cap html.tte(html)`
+  - Recibe `html` (`str`)
+  - Regresa `str` con `<title>` o `""` si no existe
+- `cap html.sct(html, css)`
+  - Recibe `html` (`str`) y `css` (`str`)
+  - Regresa lista TOON de strings (`textContent`) para los matches
+  - Si no hay matches, regresa lista vacia
+
+Ejemplo corto:
+
+```nova
+let pg = cap http.get("https://example.com")
+let ti = cap html.tte(pg)
+let hs = cap html.sct(pg, "h1")
+```

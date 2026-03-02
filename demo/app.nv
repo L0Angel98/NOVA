@@ -1,4 +1,4 @@
-﻿mdl demo v"0.1.0" rst<any, err> {
+﻿mdl demo v"0.1.2" rst<any, err> {
   rte "/ping" GET json {
     rst.ok({method: ctx.method, request_id: ctx.request_id, service: "nova-demo", version: "0.1.0"})
   }

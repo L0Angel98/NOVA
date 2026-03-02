@@ -4,9 +4,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import platform
 from pathlib import Path
 import re
-from typing import Any, Dict, Iterable, List
+import sys
+from typing import Any, Dict, Iterable, List, Tuple
 
 from .parser import parse_nova
 from .toon import ToonDecodeError, decode_toon, encode_toon
@@ -93,22 +95,28 @@ def init_agent_knowledge(
     force: bool = False,
 ) -> AgentInitReport:
     agent_path = default_agent_path(root)
-    agent_written = _init_index(root, agent_path, force=force)
-    sync = sync_agent(root, agent_path)
+    agent_rows = _default_agent_rows(root)
+    agent_text = encode_toon(
+        [{"key": row.key, "value": row.value, "origin": row.origin} for row in agent_rows]
+    )
 
-    # Legacy files are kept as optional placeholders for backwards compatibility.
-    dictionary_written = _write_if_allowed(dictionary_path, encode_toon([]), force=force)
-    guide_written = _write_if_allowed(guide_path, "# NOVA Language Notes\n", force=force)
+    rows = _default_dictionary_rows()
+    dictionary_text = encode_toon(rows)
+    guide_text = _default_language_guide_markdown(root.name or "project")
+
+    agent_written = _write_if_allowed(agent_path, agent_text, force=force)
+    dictionary_written = _write_if_allowed(dictionary_path, dictionary_text, force=force)
+    guide_written = _write_if_allowed(guide_path, guide_text, force=force)
 
     return AgentInitReport(
-        agent_path=sync.path,
+        agent_path=agent_path,
         dictionary_path=dictionary_path,
         guide_path=guide_path,
         agent_written=agent_written,
         dictionary_written=dictionary_written,
         guide_written=guide_written,
-        agent_rows=sync.file_count,
-        dictionary_rows=0,
+        agent_rows=len(agent_rows),
+        dictionary_rows=len(rows),
     )
 
 
@@ -271,61 +279,209 @@ def _scan_caps(root: Path, files: List[Path]) -> List[str]:
     for file in files:
         if file.suffix.lower() != ".nv":
             continue
-        try:
-            ast = parse_nova(file.read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        for node in _collect_nodes(ast, "CapStmt"):
-            caps.update(_caps_from_expr(node.get("value")))
-        for call in _collect_nodes(ast, "CallExpr"):
-            fn = _callee_name(call.get("callee"))
-            if fn.startswith("http.") or fn.startswith("net."):
-                caps.add("net")
-            if fn.startswith("html."):
-                caps.add("html")
-            if fn.startswith("db."):
-                caps.add("db")
-    return sorted(caps)
+        origin = row.origin if row.origin in {"manual", "auto"} else "manual"
+        by_key[key] = AgentRow(key=key, value=_to_stable_value(row.value), origin=origin)
+    return sorted(by_key.values(), key=lambda row: row.key)
 
 
-def _scan_deps(root: Path) -> List[str]:
-    pyproject = root / "pyproject.toml"
-    if not pyproject.exists():
-        return []
-    text = pyproject.read_text(encoding="utf-8")
-
-    deps: List[str] = []
-    in_deps = False
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("dependencies") and "[" in stripped:
-            in_deps = True
-            continue
-        if in_deps and stripped.startswith("]"):
-            break
-        if in_deps:
-            item = stripped.strip(",").strip().strip('"').strip("'")
-            if item:
-                deps.append(item)
-    return deps
+def _to_stable_value(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if value is None:
+        return "nul"
+    if isinstance(value, bool):
+        return "tru" if value else "fal"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def _build_summary(root: Path, files: List[Path], routes: List[Dict[str, Any]], caps: List[str]) -> List[str]:
-    nv_count = len([f for f in files if f.suffix.lower() == ".nv"])
-    py_count = len([f for f in files if f.suffix.lower() == ".py"])
-    md_count = len([f for f in files if f.suffix.lower() == ".md"])
-    demo_count = len([f for f in files if f.relative_to(root).as_posix().startswith("demo/")])
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
-    lines = [
-        f"project={root.name or root.as_posix()}",
-        f"files={len(files)}",
-        f"nv={nv_count}",
-        f"py={py_count}",
-        f"md={md_count}",
-        f"demo={demo_count}",
-        f"routes={len(routes)}",
-        f"caps={','.join(caps) if caps else '-'}",
-        f"ts={_utc_now_iso()}",
+
+def _default_agent_rows(root: Path) -> List[AgentRow]:
+    gen = {
+        "by": "nova",
+        "at": _utc_now_iso(),
+        "os": platform.system().lower(),
+        "py": ".".join(str(part) for part in sys.version_info[:3]),
+    }
+    ignores = [
+        ".git",
+        "node_modules",
+        "dist",
+        "build",
+        "__pycache__",
+        ".venv",
+        ".next",
+        "coverage",
+        ".pytest_cache",
+        ".mypy_cache",
+    ]
+    ns = {"ctx": "reserved", "db": "reserved"}
+    cxa = {"q": "query", "p": "params", "h": "headers", "b": "body"}
+    cap = {"net": "http.get", "html": ["tte", "sct"]}
+    fs = {"ent": len(list(_iter_project_files(root))), "upd": _utc_now_iso()}
+    fls = _important_files(root, max_items=30)
+    tsk = ["sync", "chk", "pack"]
+    legacy = {"routes": [], "tests": [], "synced_at_utc": ""}
+
+    manual_rows = [
+        AgentRow(key="v", value="0.1.2", origin="manual"),
+        AgentRow(key="k", value="agt", origin="manual"),
+        AgentRow(key="gen", value=_to_stable_value(gen), origin="manual"),
+        AgentRow(key="rt", value=".", origin="manual"),
+        AgentRow(key="pn", value=root.name or root.as_posix(), origin="manual"),
+        AgentRow(key="ig", value=_to_stable_value(ignores), origin="manual"),
+        AgentRow(key="ns", value=_to_stable_value(ns), origin="manual"),
+        AgentRow(key="cxa", value=_to_stable_value(cxa), origin="manual"),
+        AgentRow(key="cap", value=_to_stable_value(cap), origin="manual"),
+        AgentRow(key="fs", value=_to_stable_value(fs), origin="manual"),
+        AgentRow(key="fls", value=_to_stable_value(fls), origin="manual"),
+        AgentRow(key="tsk", value=_to_stable_value(tsk), origin="manual"),
+        AgentRow(key="leg", value=_to_stable_value(legacy), origin="manual"),
+    ]
+    return _canonicalize_rows(manual_rows)
+
+
+def _important_files(root: Path, *, max_items: int) -> List[str]:
+    selected: List[str] = []
+    seen: set[str] = set()
+
+    def add_path(path: Path) -> None:
+        rel = path.relative_to(root).as_posix()
+        if rel in seen:
+            return
+        seen.add(rel)
+        selected.append(rel)
+
+    for relative in [Path("README.md"), Path("SPEC.md"), Path("pyproject.toml")]:
+        path = root / relative
+        if path.exists() and path.is_file():
+            add_path(path)
+
+    demo_dir = root / "demo"
+    if demo_dir.exists():
+        for path in sorted(demo_dir.glob("*.nv")):
+            if path.is_file():
+                add_path(path)
+
+    nova_dir = root / "nova"
+    if nova_dir.exists():
+        for path in sorted(nova_dir.rglob("*")):
+            if path.is_file():
+                add_path(path)
+
+    return selected[:max_items]
+
+
+def _write_if_allowed(path: Path, text: str, *, force: bool) -> bool:
+    if path.exists() and not force:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return True
+
+
+def _default_dictionary_rows() -> List[Dict[str, str]]:
+    return [
+        {
+            "term": "mdl",
+            "category": "keyword",
+            "meaning": "Declaracion de modulo",
+            "example": 'mdl demo v"0.1.0" rst<any, err> { ... }',
+        },
+        {
+            "term": "rte",
+            "category": "keyword",
+            "meaning": "Declaracion de ruta HTTP",
+            "example": 'rte "/items" GET json { ... }',
+        },
+        {
+            "term": "GET|POST|PUT|PATCH|DELETE",
+            "category": "keyword",
+            "meaning": "Metodos HTTP canonicos",
+            "example": "rte \"/items\" POST json { ... }",
+        },
+        {
+            "term": "let",
+            "category": "keyword",
+            "meaning": "Binding inmutable",
+            "example": 'let name = "nova"',
+        },
+        {
+            "term": "if/els",
+            "category": "keyword",
+            "meaning": "Control de flujo condicional",
+            "example": "if x == nul { ... } els { ... }",
+        },
+        {
+            "term": "match",
+            "category": "keyword",
+            "meaning": "Pattern matching",
+            "example": 'match state { "ok" => 1 _ => 0 }',
+        },
+        {
+            "term": "grd",
+            "category": "keyword",
+            "meaning": "Validacion de presencia con error estandar",
+            "example": 'grd body, body.name : "BAD_REQUEST"',
+        },
+        {
+            "term": "tb/whe/lim/ord",
+            "category": "keyword",
+            "meaning": "DB IR declarativo",
+            "example": "tb users.q { whe active == tru ord id desc lim num10 }",
+        },
+        {
+            "term": "cap",
+            "category": "keyword",
+            "meaning": "Declaracion de capabilities estaticas",
+            "example": "cap [db, env]",
+        },
+        {
+            "term": "rst.ok / err",
+            "category": "result",
+            "meaning": "Contrato de salida para rutas",
+            "example": 'rst.ok({ok: tru}) / err {code: "BAD_REQUEST", msg: "..."}',
+        },
+        {
+            "term": "json / toon",
+            "category": "format",
+            "meaning": "Formatos de respuesta",
+            "example": "rte \"/items\" GET toon { ... }",
+        },
+        {
+            "term": "str literal",
+            "category": "literal",
+            "meaning": 'String se expresa como "..." (sin prefijo str)',
+            "example": 'let title = "hello"',
+        },
+        {
+            "term": "num literal",
+            "category": "literal",
+            "meaning": "Numero con prefijo num",
+            "example": "lim num50",
+        },
+        {
+            "term": "tru/fal/nul",
+            "category": "literal",
+            "meaning": "Booleanos y nulo canonicos",
+            "example": "if body == nul { ... }",
+        },
+        {
+            "term": "module_default_result",
+            "category": "nomenclature",
+            "meaning": "Tipo rst por defecto en firma de modulo",
+            "example": 'mdl demo v"0.1.0" rst<any, err> { ... }',
+        },
+        {
+            "term": "runtime_error_toon",
+            "category": "nomenclature",
+            "meaning": "Errores de parse/runtime en formato TOON estructurado",
+            "example": '@toon v1 + @type error + |k|v|',
+        },
     ]
 
     top = [p.relative_to(root).as_posix() for p in sorted(files)[:8]]
