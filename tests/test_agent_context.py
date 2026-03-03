@@ -15,6 +15,7 @@ from nova.agent_context import (
     pack_agent,
     sync_agent,
 )
+from nova.toon import decode_toon
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,7 +43,7 @@ class NovaAgentContextTests(unittest.TestCase):
             self.assertIn("NOVA Language Notes", report.guide_path.read_text(encoding="utf-8"))
 
             rows = {row.key: row.value for row in load_agent_rows(default_agent_path(root))}
-            self.assertEqual(rows.get("v"), "0.1.2")
+            self.assertEqual(rows.get("v"), "0.1.6")
             self.assertIn("cxa", rows)
             aliases = json.loads(rows["cxa"])
             self.assertEqual(aliases, {"q": "query", "p": "params", "h": "headers", "b": "body"})
