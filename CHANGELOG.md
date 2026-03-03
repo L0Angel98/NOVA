@@ -11,6 +11,7 @@
 - update `agt init/sync` writers to emit TOON standard (`@type array` / `@type std`) instead of legacy table/json for generated `.toon`.
 - add README section "Para agentes IA" with ordered onboarding files and `agt init/check` context flow.
 - complete repo-wide `.toon` migration audit: all tracked TOON files now use `@type array|std|error`.
+- fix test suite regressions: restore `AGT_CTX_FILES/AGT_PROMPT` scope in `agent_context`, update agent context version assertion to `0.1.6`, and remove external network dependency in experimental scraping tests.
 
 ## v0.1.6 (2026-03-02)
 

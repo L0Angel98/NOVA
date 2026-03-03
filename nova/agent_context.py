@@ -42,6 +42,8 @@ NET_DRV_META = {
     "sel": "env:NOVA_NET_DRIVER",
     "nt": "browser=headless,install_chromium,js",
 }
+AGT_CTX_FILES = [".nova/idx.toon", "agent.dictionary.toon", "NOVA_LANGUAGE.md"]
+AGT_PROMPT = "read ctxf first; on project change run agt sync; before answer run agt pack"
 
 
 @dataclass(frozen=True)
@@ -815,15 +817,3 @@ def _callee_name(expr: Any) -> str:
             return right
         return f"{left}.{right}"
     return ""
-
-
-def _write_if_allowed(path: Path, text: str, *, force: bool) -> bool:
-    if path.exists() and not force:
-        return False
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
-    return True
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
