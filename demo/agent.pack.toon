@@ -1,5 +1,5 @@
-﻿@toon v1
-@type table
+@toon v1
+@type array
 @rows 24
 |k|v|
 |"sys.agent.version"|"agent.v0.1"|

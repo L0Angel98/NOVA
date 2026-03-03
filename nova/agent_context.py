@@ -100,6 +100,31 @@ def default_agent_dictionary_path(root: Path) -> Path:
 def default_agent_guide_md_path(root: Path) -> Path:
     return root / DEFAULT_AGENT_GUIDE_MD_PATH
 
+def load_agent_rows(agent_path: Path) -> List[AgentRow]:
+    """Lee un archivo .toon de agente y retorna sus filas como AgentRow."""
+    if not agent_path.exists():
+        raise AgentContextError(f"agent file missing: {agent_path}")
+    text = agent_path.read_text(encoding="utf-8")
+    try:
+        value = decode_toon(text)
+    except ToonDecodeError as exc:
+        raise AgentContextError(f"invalid agent file: {exc}") from exc
+
+    rows: List[AgentRow] = []
+    if isinstance(value, list):
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("key", "")).strip()
+            val = _to_stable_value(item.get("value"))
+            origin = item.get("origin", "manual")
+            if key:
+                rows.append(AgentRow(key=key, value=val, origin=origin))
+    elif isinstance(value, dict):
+        for key, val in value.items():
+            rows.append(AgentRow(key=str(key), value=_to_stable_value(val), origin="auto"))
+
+    return rows
 
 def init_agent_knowledge(
     root: Path,
@@ -110,12 +135,13 @@ def init_agent_knowledge(
 ) -> AgentInitReport:
     agent_path = default_agent_path(root)
     agent_rows = _default_agent_rows(root)
-    agent_text = encode_toon(
-        [{"key": row.key, "value": row.value, "origin": row.origin} for row in agent_rows]
+    agent_text = _encode_array_rows(
+        [{"key": row.key, "value": row.value, "origin": row.origin} for row in agent_rows],
+        ["key", "value", "origin"],
     )
 
     rows = _default_dictionary_rows()
-    dictionary_text = encode_toon(rows)
+    dictionary_text = _encode_array_rows(rows, ["term", "category", "meaning", "example"])
     guide_text = _default_language_guide_markdown(root.name or "project")
 
     agent_written = _write_if_allowed(agent_path, agent_text, force=force)
@@ -177,7 +203,7 @@ def sync_agent(root: Path, agent_path: Path | None = None) -> AgentSyncReport:
     }
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(encode_toon(idx), encoding="utf-8")
+    path.write_text(_encode_idx_std(idx), encoding="utf-8")
     return AgentSyncReport(path=path, file_count=len(files), route_count=len(routes), cap_count=len(caps))
 
 
@@ -248,7 +274,7 @@ def _init_index(root: Path, path: Path, *, force: bool) -> bool:
         "ts": {},
     }
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(encode_toon(template), encoding="utf-8")
+    path.write_text(_encode_idx_std(template), encoding="utf-8")
     return True
 
 
@@ -376,6 +402,112 @@ def _default_language_guide_markdown(project_name: str) -> str:
         f"Proyecto: {project_name}\n\n"
         "Guia minima para agentes IA sobre sintaxis y capacidades del runtime.\n"
     )
+
+
+def _toon_cell(value: Any) -> str:
+    if value is None:
+        return "nul"
+    if value is True:
+        return "tru"
+    if value is False:
+        return "fal"
+    if isinstance(value, (int, float)):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def _pipe(cells: List[str]) -> str:
+    return "|" + "|".join(cells) + "|"
+
+
+def _encode_array_rows(rows: List[Dict[str, Any]], columns: List[str]) -> str:
+    lines = ["@toon v1", "@type array", f"@rows {len(rows)}", _pipe(columns)]
+    for row in rows:
+        cells = [_toon_cell(row.get(col)) for col in columns]
+        lines.append(_pipe(cells))
+    return "\n".join(lines) + "\n"
+
+
+def _encode_idx_std(idx: Dict[str, Any]) -> str:
+    lines = ["@toon v1", "@type std"]
+
+    lines.append("root:")
+    lines.append("  |k|v|")
+    lines.append(f'  |"v"|{_toon_cell(idx.get("v"))}|')
+    lines.append(f'  |"rt"|{_toon_cell(idx.get("rt"))}|')
+
+    def add_indexed_block(name: str, values: List[Any]) -> None:
+        lines.append(f"{name}:")
+        lines.append("  |i|v|")
+        for i, value in enumerate(values):
+            lines.append(f"  |{i}|{_toon_cell(value)}|")
+
+    add_indexed_block("sum", idx.get("sum", []) if isinstance(idx.get("sum"), list) else [])
+
+    lines.append("api:")
+    lines.append("  |i|m|p|f|s|")
+    for i, route in enumerate(idx.get("api", []) if isinstance(idx.get("api"), list) else []):
+        if not isinstance(route, dict):
+            continue
+        lines.append(
+            f'  |{i}|{_toon_cell(route.get("m", ""))}|{_toon_cell(route.get("p", ""))}|'
+            f'{_toon_cell(route.get("f", "json"))}|{_toon_cell(route.get("s", ""))}|'
+        )
+
+    add_indexed_block("cap", idx.get("cap", []) if isinstance(idx.get("cap"), list) else [])
+
+    m = idx.get("m", {}) if isinstance(idx.get("m"), dict) else {}
+    lines.append("m:")
+    lines.append("  |k|v|")
+    for key, value in m.items():
+        if isinstance(value, list):
+            continue
+        lines.append(f"  |{_toon_cell(key)}|{_toon_cell(value)}|")
+    for key, value in m.items():
+        if not isinstance(value, list):
+            continue
+        lines.append(f"  {key}:")
+        lines.append("    |i|v|")
+        for i, item in enumerate(value):
+            lines.append(f"    |{i}|{_toon_cell(item)}|")
+
+    add_indexed_block("dep", idx.get("dep", []) if isinstance(idx.get("dep"), list) else [])
+
+    lines.append("chg:")
+    lines.append("  |i|at|op|")
+    for i, change in enumerate(idx.get("chg", []) if isinstance(idx.get("chg"), list) else []):
+        if not isinstance(change, dict):
+            continue
+        lines.append(
+            f'  |{i}|{_toon_cell(change.get("at", ""))}|{_toon_cell(change.get("op", ""))}|'
+        )
+
+    ts = idx.get("ts", {}) if isinstance(idx.get("ts"), dict) else {}
+    lines.append("ts:")
+    lines.append("  |k|m|h|s|")
+    for key in sorted(ts.keys()):
+        entry = ts[key] if isinstance(ts[key], dict) else {}
+        lines.append(
+            f"  |{_toon_cell(key)}|{_toon_cell(entry.get('m'))}|{_toon_cell(entry.get('h'))}|{_toon_cell(entry.get('s'))}|"
+        )
+
+    nd = idx.get("nd", {}) if isinstance(idx.get("nd"), dict) else {}
+    lines.append("#nova_nd:")
+    lines.append("  |k|v|")
+    for key, value in nd.items():
+        lines.append(f"  |{_toon_cell(key)}|{_toon_cell(value)}|")
+
+    lines.append("#nova_ctx:")
+    lines.append("  |k|v|")
+    lines.append(f'  |"ctxf"|{_toon_cell(idx.get("ctxf", AGT_CTX_FILES))}|')
+    lines.append(f'  |"prm"|{_toon_cell(idx.get("prm", AGT_PROMPT))}|')
+
+    lines.append("#nova_optional:")
+    lines.append("  |k|v|")
+    lines.append('  |"m.demo"|"optional list block"|')
+    lines.append('  |"ctx.prm"|"optional agent prompt"|')
+
+    return "\n".join(lines) + "\n"
 
 
 def _to_stable_value(value: Any) -> str:

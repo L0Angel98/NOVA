@@ -9,6 +9,8 @@ TOON_VERSION_LINE = "@toon v1"
 TOON_TABLE_LINE = "@type table"
 TOON_JSON_LINE = "@type json"
 TOON_STD_LINE = "@type std"
+TOON_ARRAY_LINE = "@type array"
+TOON_ERROR_LINE = "@type error"
 
 HEADER_PATTERN = re.compile(r"^(?P<name>[^\[\]]+?)(?:\[(?P<len>[0-9]+)\])?$")
 INT_PATTERN = re.compile(r"^[+-]?[0-9]+$")
@@ -55,8 +57,12 @@ def decode_toon(text: str) -> Any:
         return _decode_table(lines[2:])
     if mode == TOON_JSON_LINE:
         return _decode_json_fallback(lines[2:])
+    if mode == TOON_ARRAY_LINE:
+        return _decode_array(lines[2:])
     if mode == TOON_STD_LINE:
         return _decode_standard(lines[2:])
+    if mode == TOON_ERROR_LINE:
+        return _decode_error(lines[2:])
 
     raise ToonDecodeError(f"unsupported TOON type header: {mode}")
 
@@ -195,12 +201,82 @@ def _decode_standard(lines: List[str]) -> Any:
     if not lines:
         return {}
 
+    # Compact std variant:
+    # @toon v1
+    # @type std
+    # |k|v|
+    # |"a"|1|
+    if lines[0].lstrip().startswith("|"):
+        header = _parse_pipe_line(lines[0].strip())
+        rows: List[Dict[str, Any]] = []
+        for ridx, raw in enumerate(lines[1:]):
+            stripped = raw.strip()
+            if stripped == "":
+                continue
+            if not stripped.startswith("|"):
+                raise ToonDecodeError(f"invalid std compact line {ridx + 2}: expected table row")
+            cells = _parse_pipe_line(stripped)
+            if len(cells) != len(header):
+                raise ToonDecodeError(
+                    f"std compact row {ridx} has {len(cells)} cells, expected {len(header)}"
+                )
+            row: Dict[str, Any] = {}
+            for cidx, col in enumerate(header):
+                row[col] = _decode_cell(cells[cidx])
+            rows.append(row)
+        return _materialize_standard_table(header, rows)
+
     entries = _parse_standard_entries(lines)
     if not entries:
         return {}
 
     root = _parse_standard_tree(entries)
     return _materialize_standard_root(root)
+
+
+def _decode_array(lines: List[str]) -> Any:
+    if not lines:
+        return []
+
+    idx = 0
+    if lines[0].startswith("@rows "):
+        idx = 1
+    if idx >= len(lines):
+        return []
+
+    header = _parse_pipe_line(lines[idx].strip())
+    if header == ["_"]:
+        return []
+
+    rows: List[Dict[str, Any]] = []
+    for ridx, raw in enumerate(lines[idx + 1 :]):
+        stripped = raw.strip()
+        if stripped == "":
+            continue
+        if not stripped.startswith("|"):
+            raise ToonDecodeError(f"invalid array row at line {ridx + idx + 2}")
+        cells = _parse_pipe_line(stripped)
+        if len(cells) != len(header):
+            raise ToonDecodeError(
+                f"array row {ridx} has {len(cells)} cells, expected {len(header)}"
+            )
+        row: Dict[str, Any] = {}
+        for cidx, col in enumerate(header):
+            row[col] = _decode_cell(cells[cidx])
+        rows.append(row)
+    return rows
+
+
+def _decode_error(lines: List[str]) -> Any:
+    data = _decode_array(lines)
+    if isinstance(data, list):
+        if all(isinstance(row, dict) and set(row.keys()) == {"k", "v"} for row in data):
+            out: Dict[str, Any] = {}
+            for row in data:
+                out[str(row.get("k", ""))] = row.get("v")
+            return out
+        return {"rows": data}
+    return data
 
 
 def _parse_standard_entries(lines: List[str]) -> List[Tuple[int, str]]:

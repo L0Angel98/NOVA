@@ -6,7 +6,7 @@ from .formatter import format_nova
 from .parser import parse_nova, parse_toon
 from .runtime import NovaRuntime, run_server
 from .toon import decode_toon, encode_toon
-from .agent_context import check_agent, pack_agent, sync_agent
+from .agent_context import check_agent, pack_agent, sync_agent, load_agent_rows
 from .version import VERSION
 
 __version__ = VERSION
@@ -30,4 +30,5 @@ __all__ = [
     "run_server",
     "encode_toon",
     "decode_toon",
+	"load_agent_rows",
 ]
