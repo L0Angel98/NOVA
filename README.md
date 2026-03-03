@@ -19,6 +19,13 @@ pip install -e .
 nova --version
 ```
 
+Instalacion sin descargar/clonar el repositorio:
+
+```bash
+pip install "nova-lang @ git+https://github.com/L0Angel98/NOVA.git@v0.1.6"
+nova --version
+```
+
 ## Versioned Capabilities
 
 ### v0.1.2
