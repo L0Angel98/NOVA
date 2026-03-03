@@ -7,7 +7,21 @@ import sys
 from typing import Any, Dict, Set, Tuple
 
 from nova.cap import DbSqliteCap, DbSqliteError, HttpCapError, html_sct, html_tte, http_get
-from nova.ir.nodes import IrArr, IrCall, IrCap, IrExpr, IrId, IrJson, IrLet, IrMdl, IrObj, IrRstErr, IrRstOk, IrStmt
+from nova.ir.nodes import (
+    IrArr,
+    IrCall,
+    IrCap,
+    IrExpr,
+    IrGrd,
+    IrId,
+    IrJson,
+    IrLet,
+    IrMdl,
+    IrObj,
+    IrRstErr,
+    IrRstOk,
+    IrStmt,
+)
 
 from .base import BackendBuildResult, BackendError
 
@@ -62,6 +76,16 @@ class _IrVm:
                 continue
             if kind == "cap":
                 _ = stmt if isinstance(stmt, IrCap) else None
+                continue
+            if kind == "grd":
+                s = stmt if isinstance(stmt, IrGrd) else None
+                if s is None:
+                    raise BackendError("invalid grd node")
+                code = str(self._eval_expr(s.c))
+                for target in s.t:
+                    value = self._eval_expr(target)
+                    if not self._guard_value_present(value):
+                        return False, {"code": code, "msg": f"missing required value: {self._expr_label(target)}"}
                 continue
             if kind == "call":
                 s = stmt if isinstance(stmt, IrCall) else None
@@ -132,6 +156,18 @@ class _IrVm:
         if name == "fal":
             return False
         return None
+
+    def _guard_value_present(self, value: Any) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return value.strip() != ""
+        return True
+
+    def _expr_label(self, expr: IrExpr) -> str:
+        if isinstance(expr, IrId):
+            return expr.n
+        return "<expr>"
 
     def _require_cap(self, cap: str, op: str) -> None:
         if cap not in self.caps:

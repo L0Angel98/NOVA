@@ -52,6 +52,13 @@ class IrCap:
 
 
 @dataclass(frozen=True)
+class IrGrd:
+    k: str = "grd"
+    t: List["IrExpr"] = field(default_factory=list)
+    c: "IrExpr" = field(default_factory=IrJson)
+
+
+@dataclass(frozen=True)
 class IrRstOk:
     k: str = "rst.ok"
     v: IrExpr = field(default_factory=IrJson)
@@ -63,7 +70,7 @@ class IrRstErr:
     v: IrExpr = field(default_factory=IrJson)
 
 
-IrStmt = Union[IrLet, IrCap, IrCall, IrRstOk, IrRstErr]
+IrStmt = Union[IrLet, IrCap, IrGrd, IrCall, IrRstOk, IrRstErr]
 
 
 @dataclass(frozen=True)

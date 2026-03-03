@@ -3,7 +3,22 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List
 
-from .nodes import IrArr, IrCall, IrCap, IrExpr, IrId, IrJson, IrLet, IrMdl, IrObj, IrRstErr, IrRstOk, IrRte, IrStmt
+from .nodes import (
+    IrArr,
+    IrCall,
+    IrCap,
+    IrExpr,
+    IrGrd,
+    IrId,
+    IrJson,
+    IrLet,
+    IrMdl,
+    IrObj,
+    IrRstErr,
+    IrRstOk,
+    IrRte,
+    IrStmt,
+)
 
 
 class IrEmitError(ValueError):
@@ -89,6 +104,11 @@ def _emit_stmt(stmt: Dict[str, Any], *, allow_cap_stmt: bool) -> IrStmt | None:
         return IrRstErr(v=_emit_expr(stmt["value"]))
     if typ == "CapStmt" and allow_cap_stmt:
         return IrCap(c=_emit_caps(stmt.get("value")))
+    if typ == "GuardStmt":
+        return IrGrd(
+            t=[_emit_expr(target) for target in stmt.get("targets", [])],
+            c=_emit_expr(stmt.get("code", {"type": "StringLiteral", "value": "BAD_REQUEST"})),
+        )
     raise IrEmitError(f"unsupported statement type '{typ}' for IR")
 
 
