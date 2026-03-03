@@ -2,6 +2,16 @@
 
 NOVA es un DSL IA-first para APIs y scripting con IR estable y backends pluggable.
 
+## Para agentes IA
+Onboarding: lee contexto en este orden antes de analizar o modificar código.
+1. `nova_skill.md`: sintaxis core, flujo operativo y comandos del proyecto.
+2. `agent.dictionary.toon`: diccionario actual de keywords, contratos y ejemplos.
+3. `.nova/idx.toon`: estado del repo (rutas, caps, mapa de archivos, cambios, hashes).
+4. `CHANGELOG.md`: cambios recientes y alcance real por versión.
+Inicializar contexto (si falta o es nuevo): `nova agt init --root .`
+Verificar estado del contexto: `nova agt check`
+TOON es el formato nativo de contexto (columnar/determinista), ~61% menos tokens que JSON.
+
 ## Instalacion
 
 ```bash

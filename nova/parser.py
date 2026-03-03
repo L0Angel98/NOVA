@@ -678,7 +678,7 @@ def parse_nova(source: str) -> Dict[str, Any]:
 
 
 def parse_toon(source: str) -> Any:
-    """Parse TOON payloads (table/json/std) into JSON-compatible values."""
+    """Parse TOON payloads (@type array|std|error|table|json) into JSON-compatible values."""
     from .toon import ToonDecodeError, decode_toon
 
     try:
