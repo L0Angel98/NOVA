@@ -88,6 +88,29 @@ root:
         parsed = parse_toon(payload)
         self.assertEqual(parsed["v"], "0.1.6")
 
+    def test_toon_array_and_error_types(self) -> None:
+        arr = """@toon v1
+@type array
+|id|name|
+|1|"a"|
+|2|"b"|
+"""
+        self.assertEqual(
+            decode_toon(arr),
+            [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}],
+        )
+
+        err = """@toon v1
+@type error
+|k|v|
+|"code"|"BAD_REQUEST"|
+|"msg"|"missing field"|
+"""
+        self.assertEqual(
+            decode_toon(err),
+            {"code": "BAD_REQUEST", "msg": "missing field"},
+        )
+
     def test_http_text_toon_request_and_response(self) -> None:
         server = run_server(DEMO_APP, host="127.0.0.1", port=0, capabilities={"db"})
         thread = threading.Thread(target=server.serve_forever, daemon=True)

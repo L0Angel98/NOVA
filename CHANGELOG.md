@@ -4,8 +4,13 @@
 
 - migrate `.nova/idx.toon` to TOON standard columnar blocks (`@type std`) with NOVA extensions via `#nova_*`.
 - migrate `agent.dictionary.toon` to TOON standard columnar blocks (`@type std`) and keep NOVA metadata blocks.
+- migrate `agent.toon` and `demo/agent.pack.toon` from legacy `@type table` to standard `@type array`.
 - extend TOON parser/decoder to accept standard block format with indentation-based nested objects.
+- extend TOON parser/decoder with `@type array` and `@type error` support.
 - add `parse_toon` entry point in `nova/parser.py` for TOON standard payload parsing.
+- update `agt init/sync` writers to emit TOON standard (`@type array` / `@type std`) instead of legacy table/json for generated `.toon`.
+- add README section "Para agentes IA" with ordered onboarding files and `agt init/check` context flow.
+- complete repo-wide `.toon` migration audit: all tracked TOON files now use `@type array|std|error`.
 
 ## v0.1.6 (2026-03-02)
 

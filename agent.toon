@@ -1,5 +1,5 @@
 @toon v1
-@type table
+@type array
 @rows 24
 |key|value|origin|
 |"async_core"|"asy,awt"|"manual"|
